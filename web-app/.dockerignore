@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.md
+.git
+.gitignore
+trust.json
+bedrock-policy.json

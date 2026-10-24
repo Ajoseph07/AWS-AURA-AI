@@ -1,0 +1,20 @@
+# AWS App Runner configuration for the AURA AI web app.
+# Used when App Runner builds directly from source (not the Dockerfile path).
+version: 1.0
+runtime: python3
+build:
+  commands:
+    build:
+      - pip install -r requirements.txt
+run:
+  runtime-version: 3.12
+  command: gunicorn --bind 0.0.0.0:8000 --workers 2 --threads 4 --timeout 120 app:app
+  network:
+    port: 8000
+  env:
+    - name: AWS_REGION
+      value: us-east-1
+    - name: BEDROCK_MODEL_ID
+      value: anthropic.claude-sonnet-4-6
+    - name: USE_BEDROCK
+      value: "auto"
