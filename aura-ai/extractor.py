@@ -15,7 +15,7 @@ import re
 from models import CATEGORIES, Message
 
 SYSTEM = (
-    "You are FoodBridge's extraction engine for a food-bank mutual-aid network. "
+    "You are AURA AI's extraction engine for a food-bank mutual-aid network. "
     "Convert each informal partner message into structured JSON. "
     "Do not invent organizations, items, or quantities that are not present."
 )

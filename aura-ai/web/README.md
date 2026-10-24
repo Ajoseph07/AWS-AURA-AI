@@ -1,6 +1,6 @@
-# FoodBridge Web UI
+# AURA AI Web UI
 
-A single-page web interface for the FoodBridge demo. Paste partner messages,
+A single-page web interface for the AURA AI demo. Paste partner messages,
 click **Process**, and see the proposed transfer plan rendered live.
 
 **Zero dependencies** — uses only the Python standard library, so it runs
@@ -9,7 +9,7 @@ anywhere (your laptop, AWS CloudShell, a workshop account) with no `pip install`
 ## Run it
 
 ```bash
-cd foodbridge/web
+cd aura-ai/web
 
 # Offline extraction (no AWS needed — perfect for rehearsing the demo):
 python server.py

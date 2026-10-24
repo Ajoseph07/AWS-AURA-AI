@@ -1,4 +1,4 @@
-"""Shared data models for FoodBridge.
+"""Shared data models for AURA AI.
 
 Kept as plain dataclasses so the pipeline stays dependency-light and easy to
 serialize to JSON (e.g. for the web UI or an API response).
@@ -8,7 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 from typing import Any
 
-# Canonical food/supply categories FoodBridge understands.
+# Canonical food/supply categories AURA AI understands.
 CATEGORIES = [
     "baby_formula",
     "shelf_stable_meals",
