@@ -144,11 +144,6 @@ class Handler(BaseHTTPRequestHandler):
             self._file(os.path.join(HERE, "dashboard.html"), "text/html; charset=utf-8")
         elif route in ("/classic", "/index.html"):
             self._file(os.path.join(HERE, "index.html"), "text/html; charset=utf-8")
-        elif route == "/config.js":
-            # Injects the Maps key from the environment so it is never committed.
-            key = os.environ.get("GOOGLE_MAPS_API_KEY", "")
-            body = f"window.AURA_CONFIG = {{ googleMapsKey: {json.dumps(key)} }};"
-            self._send(200, body.encode("utf-8"), "application/javascript")
         elif route == "/api/demo":
             self._file(os.path.join(AURA_AI_DIR, "demo_scenario.json"), "application/json")
         elif route == "/api/hazards":

@@ -50,14 +50,6 @@ def classic():
     return send_from_directory(app.static_folder, "index.html")
 
 
-@app.get("/config.js")
-def config_js():
-    """Inject the Maps key from the environment so it is never committed."""
-    key = os.environ.get("GOOGLE_MAPS_API_KEY", "")
-    body = f"window.AURA_CONFIG = {{ googleMapsKey: {json.dumps(key)} }};"
-    return app.response_class(body, mimetype="application/javascript")
-
-
 @app.get("/api/demo")
 def demo():
     return send_from_directory(app.static_folder, "demo_scenario.json")

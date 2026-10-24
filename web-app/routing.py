@@ -65,54 +65,60 @@ def _danger_score(path: list[tuple[float, float]], zones: list[dict]) -> dict:
 
 def safest_route(origin: tuple[float, float], dest: tuple[float, float],
                  zones: list[dict], api_key: str | None = None) -> dict:
-    """Return the safest route from origin to dest avoiding danger zones."""
-    api_key = api_key or os.environ.get("GOOGLE_MAPS_API_KEY")
-    if api_key:
-        try:
-            return _google_safest_route(origin, dest, zones, api_key)
-        except Exception as exc:  # noqa: BLE001
-            # Fall through to the straight-line advisory on any API error.
-            advisory = _straight_line(origin, dest, zones)
-            advisory["note"] = f"Live routing unavailable ({exc.__class__.__name__}); straight-line advisory."
-            return advisory
-    return _straight_line(origin, dest, zones)
+    """Return the safest driving route from origin to dest.
+
+    Uses the free, keyless OSRM public routing service (alternatives=true) and
+    picks the route that stays clearest of active danger zones. Falls back to a
+    straight-line danger assessment if OSRM is unreachable (e.g. offline demo).
+    """
+    try:
+        return _osrm_safest_route(origin, dest, zones)
+    except Exception as exc:  # noqa: BLE001
+        advisory = _straight_line(origin, dest, zones)
+        advisory["note"] = (f"Live routing unavailable ({exc.__class__.__name__}); "
+                            "showing a straight-line danger assessment.")
+        return advisory
 
 
-def _google_safest_route(origin, dest, zones, api_key) -> dict:
-    params = {
-        "origin": f"{origin[0]},{origin[1]}",
-        "destination": f"{dest[0]},{dest[1]}",
-        "alternatives": "true",
-        "mode": "driving",
-        "key": api_key,
-    }
-    url = "https://maps.googleapis.com/maps/api/directions/json?" + urllib.parse.urlencode(params)
-    with urllib.request.urlopen(url, timeout=8) as resp:
+# Public OSRM demo server. Override with OSRM_URL for a self-hosted instance.
+OSRM_URL = os.environ.get("OSRM_URL", "https://router.project-osrm.org")
+
+
+def _osrm_safest_route(origin, dest, zones) -> dict:
+    """Query OSRM for driving routes (lon,lat order) and score them by danger."""
+    coords = f"{origin[1]},{origin[0]};{dest[1]},{dest[0]}"
+    url = (f"{OSRM_URL}/route/v1/driving/{coords}"
+           "?alternatives=true&overview=full&geometries=geojson")
+    req = urllib.request.Request(url, headers={"User-Agent": "AURA-AI/1.0"})
+    with urllib.request.urlopen(req, timeout=8) as resp:
         data = json.loads(resp.read().decode("utf-8"))
-    if data.get("status") != "OK" or not data.get("routes"):
-        raise RuntimeError(data.get("status", "no routes"))
+    if data.get("code") != "Ok" or not data.get("routes"):
+        raise RuntimeError(data.get("code", "no routes"))
 
     scored = []
     for route in data["routes"]:
-        path = _decode_polyline(route["overview_polyline"]["points"])
-        leg = route["legs"][0]
+        # GeoJSON geometry is [lon, lat]; convert to (lat, lon) for scoring + Leaflet.
+        path = [(c[1], c[0]) for c in route["geometry"]["coordinates"]]
+        km = route["distance"] / 1000.0
+        mins = route["duration"] / 60.0
         danger = _danger_score(path, zones)
         scored.append({
-            "summary": route.get("summary", ""),
-            "distance": leg["distance"]["text"],
-            "duration": leg["duration"]["text"],
-            "duration_s": leg["duration"]["value"],
-            "polyline": route["overview_polyline"]["points"],
+            "summary": "",
+            "distance": f"{km:.1f} km",
+            "duration": f"{round(mins)} min",
+            "duration_s": int(route["duration"]),
+            "path": path,            # [[lat, lon], ...] for Leaflet polyline
             "danger": danger,
         })
     # Safest first (lowest danger), then fastest among equally-safe routes.
     scored.sort(key=lambda r: (r["danger"]["score"], r["duration_s"]))
     best, alternatives = scored[0], scored[1:]
+    rerouted = bool(alternatives) and alternatives[0]["danger"]["score"] > best["danger"]["score"]
     return {
-        "mode": "google",
+        "mode": "osrm",
         "chosen": best,
         "alternatives": alternatives,
-        "avoided_danger": bool(alternatives) and alternatives[0]["danger"]["score"] > best["danger"]["score"],
+        "avoided_danger": rerouted,
         "note": "Route is clear of active danger zones." if best["danger"]["clear"]
                 else "Safest available route; still crosses a hazard — advise caution.",
     }
@@ -131,12 +137,11 @@ def _straight_line(origin, dest, zones) -> dict:
             "distance": f"{km:.1f} km (as the crow flies)",
             "duration": "—",
             "duration_s": 0,
-            "polyline": None,
             "path": samples,
             "danger": danger,
         },
         "alternatives": [],
         "avoided_danger": False,
-        "note": "No Google Maps key set — showing a straight-line danger assessment. "
-                "Add GOOGLE_MAPS_API_KEY for real safest-route driving directions.",
+        "note": "Routing service unreachable — showing a straight-line danger "
+                "assessment between the two points.",
     }
