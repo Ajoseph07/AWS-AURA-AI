@@ -35,7 +35,7 @@ CATALOG: dict[str, list[str]] = {
     "Vegetables": [
         "Canned corn", "Canned green beans", "Canned peas", "Canned carrots",
         "Canned tomatoes", "Canned spinach", "Canned mushrooms", "Canned potatoes",
-        "Mixed vegetables", "Tomato sauce",
+        "Mixed vegetables", "Tomato sauce", "Potatoes",
     ],
     "Dairy and Alternatives": [
         "Shelf-stable milk", "Powdered milk", "Evaporated milk", "Condensed milk",
@@ -105,7 +105,9 @@ _ALIASES: dict[str, str] = {
     "tomatoes": "Canned tomatoes",
     "spinach": "Canned spinach",
     "mushrooms": "Canned mushrooms",
-    "potatoes": "Canned potatoes",
+    "canned potatoes": "Canned potatoes",
+    "potatoes": "Potatoes",
+    "potato": "Potatoes",
     "veggies": "Mixed vegetables",
     "vegetables": "Mixed vegetables",
     "uht milk": "Shelf-stable milk",

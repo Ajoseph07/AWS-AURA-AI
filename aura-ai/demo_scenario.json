@@ -28,7 +28,8 @@
     "St. Justin Community Ministry | Need 25 cases of cereal",
     "Mission Market Pantry | Tomato sauce 20 cases",
     "Christian Worship Center | Canned salmon 18 cases",
-    "St. Vincent de Paul – St. Pius | Urgent: bread 30 cases"
+    "St. Vincent de Paul – St. Pius | Urgent: bread 30 cases",
+    "Hope’s Corner | Ran out of potatoes, need 35 cases this week"
   ],
   "offers": [
     "Second Harvest of Silicon Valley | Surplus of 80 cases of shelf-stable meal kits available",
@@ -55,7 +56,8 @@
     "The Salvation Army – Sunnyvale | 30 cases of evaporated milk",
     "West Valley Presbyterian Church | 25 cases of cereal",
     "Our Lady Star of the Sea Church | 15 cases of tomato sauce",
-    "The Salvation Army – Redwood City | 20 cases of bagels, expires in 2 days"
+    "The Salvation Army – Redwood City | 20 cases of bagels, expires in 2 days",
+    "Second Harvest of Silicon Valley | Surplus of 60 cases of potatoes to share"
   ],
   "scenario": {
     "enabled": true,
