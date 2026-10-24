@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AURA AI — AI Mutual-Aid Exchange</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2029;
+    --panel-2: #222a35;
+    --line: #2d3744;
+    --text: #e6edf3;
+    --muted: #8b98a9;
+    --accent: #4ea1ff;
+    --green: #3fb950;
+    --amber: #e3b341;
+    --red: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+  }
+  header {
+    padding: 20px 28px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 20px; margin: 0; }
+  header .tag { color: var(--muted); font-size: 13px; }
+  .mode {
+    margin-left: auto; font-size: 12px; padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted);
+  }
+  .layout { display: grid; grid-template-columns: 420px 1fr; gap: 0; min-height: calc(100vh - 66px); }
+  .left { border-right: 1px solid var(--line); padding: 20px; display: flex; flex-direction: column; }
+  .right { padding: 20px 28px; overflow-y: auto; }
+  label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  textarea {
+    width: 100%; flex: 1; min-height: 340px; margin-top: 8px; resize: vertical;
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 12px; font-family: ui-monospace, Menlo, monospace; font-size: 13px;
+  }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .btn-row { display: flex; gap: 10px; margin-top: 14px; }
+  button {
+    background: var(--accent); color: #04121f; border: 0; border-radius: 8px;
+    padding: 10px 16px; font-weight: 600; font-size: 14px; cursor: pointer;
+  }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: default; }
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .stat {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 14px; min-width: 92px;
+  }
+  .stat .n { font-size: 22px; font-weight: 700; }
+  .stat .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 22px 0 10px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 12px 14px; margin-bottom: 10px;
+  }
+  .transfer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .org { font-weight: 600; }
+  .arrow { color: var(--accent); font-weight: 700; }
+  .qty { color: var(--text); }
+  .badge {
+    font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted);
+  }
+  .badge.u5 { border-color: var(--red); color: var(--red); }
+  .badge.u4 { border-color: var(--red); color: var(--red); }
+  .badge.u3 { border-color: var(--amber); color: var(--amber); }
+  .notes { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .alert { border-left: 3px solid var(--red); }
+  .alert .msg { color: #ffb3ad; }
+  .empty { color: var(--muted); font-style: italic; }
+  .pill-req { color: var(--amber); }
+  .pill-off { color: var(--green); }
+  .msg-row { display: flex; gap: 10px; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .msg-row:last-child { border-bottom: 0; }
+  .msg-kind { width: 64px; font-weight: 600; }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>🥫 AURA AI</h1>
+    <span class="tag">AI Food Bank Mutual-Aid Exchange</span>
+    <span class="mode" id="mode">extraction: …</span>
+  </header>
+
+  <div class="layout">
+    <div class="left">
+      <label for="input">Paste partner messages</label>
+      <textarea id="input" placeholder="One message per line. Optional org prefix:
+Northside Pantry | We are out of baby formula, need 40 units ASAP!
+Harbor Kitchen | Surplus 120 units of infant formula to share"></textarea>
+      <p class="hint">Format: <code>Org Name | message</code> (the org prefix is optional).</p>
+      <div class="btn-row">
+        <button id="process">Process</button>
+        <button class="secondary" id="load">Load 30 sample messages</button>
+        <button class="secondary" id="clear">Clear</button>
+      </div>
+    </div>
+
+    <div class="right">
+      <div class="stats" id="stats"></div>
+      <div id="output">
+        <p class="empty">Paste messages (or load the samples) and click <strong>Process</strong> to see the transfer plan.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+function urgencyClass(u) { return u >= 5 ? 'u5' : u === 4 ? 'u4' : u === 3 ? 'u3' : ''; }
+
+async function loadSamples() {
+  const res = await fetch('/sample');
+  const data = await res.json();
+  $('input').value = data.map(m => `${m.org} | ${m.text}`).join('\n');
+}
+
+function renderStats(c) {
+  $('stats').innerHTML = [
+    ['messages', c.messages], ['requests', c.requests], ['offers', c.offers],
+    ['transfers', c.transfers], ['alerts', c.alerts],
+  ].map(([l, n]) => `<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`).join('');
+}
+
+function renderTransfers(ts) {
+  if (!ts.length) return '<p class="empty">No feasible transfers found.</p>';
+  return ts.map(t => `
+    <div class="card">
+      <div class="transfer">
+        <span class="org">${t.from_org}</span>
+        <span class="arrow">→</span>
+        <span class="org">${t.to_org}</span>
+        <span class="qty">· ${t.quantity} ${t.unit} of ${t.item}</span>
+        <span class="badge ${urgencyClass(t.urgency)}">urgency ${t.urgency}</span>
+        <span class="badge">${t.category}</span>
+        <span class="badge">score ${t.score}</span>
+      </div>
+      ${t.notes && t.notes.length ? `<div class="notes">↳ ${t.notes.join(' · ')}</div>` : ''}
+    </div>`).join('');
+}
+
+function renderAlerts(as) {
+  if (!as.length) return '<p class="empty">None — all urgent needs have a proposed match. ✅</p>';
+  return as.map(a => `
+    <div class="card alert">
+      <div class="msg">⚠ ${a.message}</div>
+    </div>`).join('');
+}
+
+function renderMessages(ms) {
+  return ms.map(m => `
+    <div class="msg-row">
+      <span class="msg-kind ${m.kind === 'request' ? 'pill-req' : 'pill-off'}">${m.kind.toUpperCase()}</span>
+      <span style="flex:1">${m.org} — <strong>${m.quantity} ${m.unit}</strong> ${m.item}
+        ${m.constraints.length ? `<span class="badge">${m.constraints.join(', ')}</span>` : ''}
+        <span class="badge ${urgencyClass(m.urgency)}">u${m.urgency}</span>
+      </span>
+    </div>`).join('');
+}
+
+async function process() {
+  const text = $('input').value.trim();
+  if (!text) { alert('Paste some messages first (or load the samples).'); return; }
+  $('process').disabled = true; $('process').textContent = 'Processing…';
+  try {
+    const res = await fetch('/api/process', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    $('mode').textContent = 'extraction: ' + data.mode;
+    renderStats(data.counts);
+    $('output').innerHTML = `
+      <h2>Proposed transfer plan</h2>${renderTransfers(data.transfers)}
+      <h2>Urgent unmet needs</h2>${renderAlerts(data.alerts)}
+      <h2>Organized messages</h2>
+      <details><summary>Show ${data.messages.length} parsed messages</summary>
+        <div class="card">${renderMessages(data.messages)}</div>
+      </details>`;
+  } catch (e) {
+    $('output').innerHTML = `<p class="empty">Error: ${e.message}</p>`;
+  } finally {
+    $('process').disabled = false; $('process').textContent = 'Process';
+  }
+}
+
+$('process').addEventListener('click', process);
+$('load').addEventListener('click', loadSamples);
+$('clear').addEventListener('click', () => { $('input').value = ''; });
+
+// Show current extraction mode on load by probing the API with an empty batch.
+fetch('/api/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"messages":[]}' })
+  .then(r => r.json()).then(d => { if (d.mode) $('mode').textContent = 'extraction: ' + d.mode; })
+  .catch(() => {});
+</script>
+</body>
+</html>
