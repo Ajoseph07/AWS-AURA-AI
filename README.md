@@ -23,6 +23,38 @@ messages**, and press **Process**.
 > from an AWS-authenticated terminal with:
 > `PYTHONPATH=../../app python server.py`
 
+### Linux
+
+Most Linux distributions install Python 3 as `python3` (not `python`), so use
+`python3` throughout. Install Git and Python 3 first if needed:
+
+```bash
+# Debian / Ubuntu
+sudo apt update && sudo apt install -y git python3
+
+# Fedora / RHEL / Amazon Linux
+sudo dnf install -y git python3
+```
+
+Then clone and run:
+
+```bash
+git clone https://github.com/Ajoseph07/AWS-AURA-AI.git
+cd AWS-AURA-AI
+git checkout main
+git pull
+cd aura-ai/web
+python3 server.py
+```
+
+Open **http://localhost:8000**. Stop the server with **Ctrl+C**.
+
+> No virtual environment or `pip install` is needed for the web UI — it uses
+> only the Python standard library. (Python 3.9+ is required.)
+>
+> For live Bedrock extraction on Linux:
+> `PYTHONPATH=../../app python3 server.py`
+
 ## Project layout
 
 | Path | What it is |
