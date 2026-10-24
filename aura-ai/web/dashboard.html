@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AURA AI — Operations Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #1a2029;
+    --panel-2: #222a35;
+    --line: #2d3744;
+    --text: #e6edf3;
+    --muted: #8b98a9;
+    --accent: #4ea1ff;
+    --purple: #a371f7;
+    --green: #3fb950;
+    --amber: #e3b341;
+    --red: #f85149;
+    --teal: #39c5cf;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.5;
+  }
+
+  /* ---- App shell: sidebar + main ---- */
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  .sidebar { border-right: 1px solid var(--line); padding: 20px 14px; background: #0c1116; }
+  .sidebar .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; padding: 0 8px 16px; }
+  .sidebar .section { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 10px 8px 6px; }
+  .nav a {
+    display: block; padding: 8px 10px; border-radius: 6px; color: var(--muted);
+    text-decoration: none; font-size: 13px; margin-bottom: 2px;
+  }
+  .nav a:hover { background: var(--panel); color: var(--text); }
+  .nav a.active { background: var(--panel-2); color: var(--text); border-left: 2px solid var(--accent); }
+
+  main { padding: 0; overflow-y: auto; }
+  .topbar {
+    display: flex; align-items: center; gap: 16px; padding: 18px 28px;
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar h1 { font-size: 20px; margin: 0; }
+  .topbar .daterange { font-size: 12px; color: var(--muted); }
+  .topbar .daterange b { display: block; color: var(--text); font-size: 13px; }
+  .topbar .spacer { margin-left: auto; }
+  .chip { font-size: 12px; padding: 5px 12px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); }
+  .chip.green { background: var(--green); color: #04121f; border: 0; font-weight: 600; }
+
+  .content { padding: 22px 28px 48px; }
+  .section-label { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 8px 0 14px; }
+
+  /* ---- KPI tiles ---- */
+  .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-bottom: 10px; }
+  @media (max-width: 1200px) { .kpis { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 680px)  { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  .kpi {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 16px 14px;
+  }
+  .kpi .label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .kpi .value { font-size: 30px; font-weight: 700; letter-spacing: -0.5px; }
+  .kpi .delta { display: flex; gap: 10px; margin-top: 10px; font-size: 11px; color: var(--muted); }
+  .kpi .delta .up { color: var(--green); font-weight: 600; }
+  .kpi .delta .down { color: var(--red); font-weight: 600; }
+  .kpi .delta .sub { color: var(--muted); }
+
+  /* ---- Chart grid ---- */
+  .divider { border: 0; border-top: 1px solid var(--line); margin: 26px 0 18px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px;
+  }
+  .card h3 { margin: 0 0 14px; font-size: 14px; font-weight: 600; text-align: center; color: var(--text); }
+  .chart-wrap { position: relative; height: 280px; }
+  .chart-wrap.tall { height: 320px; }
+  footer { padding: 18px 28px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">🥫 AURA AI</div>
+      <div class="section">Dashboards</div>
+      <nav class="nav">
+        <a class="active" href="#">Operations Dashboard</a>
+        <a href="index.html">Mutual-Aid Exchange</a>
+        <a href="#">Demand &amp; Needs</a>
+        <a href="#">Partner Network</a>
+        <a href="#">Logistics &amp; Routing</a>
+      </nav>
+    </aside>
+
+    <!-- Main -->
+    <main>
+      <div class="topbar">
+        <h1>Operations Dashboard</h1>
+        <div class="daterange">Date range<b>Last year ▾</b></div>
+        <div class="spacer"></div>
+        <span class="chip green">✎ Edit</span>
+        <span class="chip">⇪ Share</span>
+      </div>
+
+      <div class="content">
+        <!-- ============ OVERVIEW KPIs ============ -->
+        <div class="section-label">Overview</div>
+        <div class="kpis">
+          <div class="kpi">
+            <div class="label">Total Transfers</div>
+            <div class="value">12,500</div>
+            <div class="delta"><span class="up">▲ 8%</span><span class="sub">11,540<br>Previous period</span></div>
+          </div>
+          <div class="kpi">
+            <div class="label">Units Moved</div>
+            <div class="value">486k</div>
+            <div class="delta"><span class="up">▲ 12%</span><span class="sub">434k<br>Previous period</span></div>
+          </div>
+          <div class="kpi">
+            <div class="label">Fill Rate</div>
+            <div class="value">93.7%</div>
+            <div class="delta"><span class="up">▲ 2.2%</span><span class="sub">91.5%<br>Previous period</span></div>
+          </div>
+          <div class="kpi">
+            <div class="label">Needs Met On-Time</div>
+            <div class="value">52%</div>
+            <div class="delta"><span class="down">▼ 5.3%</span><span class="sub">60%<br>Previous period</span></div>
+          </div>
+          <div class="kpi">
+            <div class="label">Urgent Unmet</div>
+            <div class="value">48%</div>
+            <div class="delta"><span class="up">▲ 8%</span><span class="sub">40%<br>Previous period</span></div>
+          </div>
+          <div class="kpi">
+            <div class="label">Transport Utilization</div>
+            <div class="value">79%</div>
+            <div class="delta"><span class="down">▼ 4%</span><span class="sub">83%<br>Previous period</span></div>
+          </div>
+        </div>
+
+        <hr class="divider" />
+
+        <!-- ============ ROW 1 ============ -->
+        <div class="section-label">Needs &amp; Fulfillment</div>
+        <div class="grid">
+          <div class="card">
+            <h3>On-Time vs. Delayed Fulfillment</h3>
+            <div class="chart-wrap"><canvas id="donut"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Actual vs. Planned Demand</h3>
+            <div class="chart-wrap"><canvas id="demand"></canvas></div>
+          </div>
+        </div>
+
+        <!-- ============ ROW 2 ============ -->
+        <div class="grid" style="margin-top:16px">
+          <div class="card">
+            <h3>Fill Rate &amp; Transport Cost by Utilization</h3>
+            <div class="chart-wrap"><canvas id="scatter"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Transfers by Category</h3>
+            <div class="chart-wrap"><canvas id="category"></canvas></div>
+          </div>
+        </div>
+
+        <!-- ============ ROW 3 ============ -->
+        <div class="grid" style="margin-top:16px">
+          <div class="card">
+            <h3>Transport Utilization Over Time</h3>
+            <div class="chart-wrap tall"><canvas id="utilization"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Completed vs. Backordered Requests</h3>
+            <div class="chart-wrap tall"><canvas id="backorders"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        AURA AI Operations Dashboard · demo data for visualization ·
+        <a href="index.html">← back to the Mutual-Aid Exchange</a>
+      </footer>
+    </main>
+  </div>
+
+<script>
+// ---- Shared Chart.js theme to match the dark design system ----
+Chart.defaults.color = '#8b98a9';
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+Chart.defaults.borderColor = '#2d3744';
+const C = { accent:'#4ea1ff', purple:'#a371f7', green:'#3fb950', amber:'#e3b341', red:'#f85149', teal:'#39c5cf', muted:'#8b98a9' };
+const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const grid = { grid: { color: '#222a35' } };
+
+// 1) Donut — on-time vs. delayed fulfillment
+new Chart(document.getElementById('donut'), {
+  type: 'doughnut',
+  data: {
+    labels: ['On-Time', '1–3 days late', 'Delayed >3 days'],
+    datasets: [{ data: [52, 31, 17], backgroundColor: [C.purple, C.teal, C.green], borderColor:'#1a2029', borderWidth: 3 }],
+  },
+  options: { cutout: '62%', plugins: { legend: { position: 'bottom' } }, maintainAspectRatio: false },
+});
+
+// 2) Actual vs. planned demand — bars + line
+new Chart(document.getElementById('demand'), {
+  data: {
+    labels: months,
+    datasets: [
+      { type:'bar', label:'Actual Demand', data:[38,41,40,42,39,43,41,44,40,42,41,45], backgroundColor:C.purple, borderRadius:4, yAxisID:'y' },
+      { type:'line', label:'Planned Demand', data:[40,40,41,41,41,42,42,42,41,42,42,43], borderColor:C.teal, backgroundColor:C.teal, tension:.4, pointRadius:2, yAxisID:'y1' },
+    ],
+  },
+  options: { maintainAspectRatio:false, plugins:{ legend:{ position:'top' } },
+    scales:{ x: grid, y:{ ...grid, position:'left' }, y1:{ grid:{drawOnChartArea:false}, position:'right' } } },
+});
+
+// 3) Scatter — fill rate / transport cost vs. utilization
+function cluster(cx, cy, n, spread, color) {
+  return { label: color.l, backgroundColor: color.c, data: Array.from({length:n}, () => ({
+    x: cx + (Math.random()-0.5)*spread, y: cy + (Math.random()-0.5)*spread*0.08 })) };
+}
+new Chart(document.getElementById('scatter'), {
+  type: 'scatter',
+  data: { datasets: [
+    cluster(64, 0.46, 16, 10, {l:'Long-Haul Routes', c:C.accent}),
+    cluster(76, 0.50, 16, 10, {l:'Regional Deliveries', c:C.green}),
+    cluster(82, 0.52, 14, 8,  {l:'Last-Mile', c:C.purple}),
+    cluster(74, 0.58, 8,  6,  {l:'Underutilized', c:C.amber}),
+  ]},
+  options: { maintainAspectRatio:false, plugins:{ legend:{ position:'top' } },
+    scales:{ x:{ ...grid, title:{display:true,text:'Utilization %'}, min:55, max:98 },
+             y:{ ...grid, title:{display:true,text:'Transport Cost / Unit'}, min:0.4, max:0.7 } } },
+});
+
+// 4) Transfers by category — horizontal bars
+new Chart(document.getElementById('category'), {
+  type: 'bar',
+  data: { labels:['Produce','Dairy','Infant Formula','Canned Goods','Water','Medicine'],
+    datasets:[{ label:'Transfers', data:[3200,2100,1450,2800,1900,1050],
+      backgroundColor:[C.green,C.teal,C.amber,C.accent,C.purple,C.red], borderRadius:4 }] },
+  options: { indexAxis:'y', maintainAspectRatio:false, plugins:{ legend:{display:false} },
+    scales:{ x:grid, y:grid } },
+});
+
+// 5) Transport utilization over time — line with band
+new Chart(document.getElementById('utilization'), {
+  data: { labels: months.concat(months.slice(0,3).map(m=>m+' ’25')),
+    datasets: [
+      { type:'line', label:'Utilization %', data:[74,82,76,89,78,80,79,83,77,81,84,80,78,82,85],
+        borderColor:C.purple, backgroundColor:C.purple, tension:.35, pointRadius:2, fill:false },
+      { type:'line', label:'Upper', data:[null,null,null,null,null,null,null,null,null,null,null,84,82,86,89],
+        borderColor:'transparent', backgroundColor:'rgba(163,113,247,.15)', pointRadius:0, fill:'+1' },
+      { type:'line', label:'Lower', data:[null,null,null,null,null,null,null,null,null,null,null,76,74,78,81],
+        borderColor:'transparent', backgroundColor:'rgba(163,113,247,.15)', pointRadius:0, fill:false },
+    ] },
+  options: { maintainAspectRatio:false, plugins:{ legend:{ labels:{ filter:i=>i.text==='Utilization %' } } },
+    scales:{ x:grid, y:{ ...grid, min:70, max:92, title:{display:true,text:'Utilization %'} } } },
+});
+
+// 6) Completed vs. backordered requests — grouped bars
+new Chart(document.getElementById('backorders'), {
+  type: 'bar',
+  data: { labels: months,
+    datasets:[
+      { label:'Completed', data:[706,649,660,668,673,691,685,691,688,675,681,687], backgroundColor:C.purple, borderRadius:3 },
+      { label:'Backordered', data:[68,64,66,62,70,65,67,67,68,67,63,70], backgroundColor:C.accent, borderRadius:3 },
+    ] },
+  options: { maintainAspectRatio:false, plugins:{ legend:{ position:'top' } },
+    scales:{ x:grid, y:grid } },
+});
+</script>
+</body>
+</html>

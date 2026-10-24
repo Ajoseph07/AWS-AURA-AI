@@ -105,6 +105,9 @@ class Handler(BaseHTTPRequestHandler):
         if self.path in ("/", "/index.html"):
             with open(os.path.join(HERE, "index.html"), "rb") as f:
                 self._send(200, f.read(), "text/html; charset=utf-8")
+        elif self.path in ("/dashboard", "/dashboard.html"):
+            with open(os.path.join(HERE, "dashboard.html"), "rb") as f:
+                self._send(200, f.read(), "text/html; charset=utf-8")
         elif self.path == "/sample":
             # Serve the bundled 30 sample messages so the demo is one click.
             with open(os.path.join(AURA_AI_DIR, "sample_messages.json"), "rb") as f:
