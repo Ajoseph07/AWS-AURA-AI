@@ -4,6 +4,8 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>AURA AI — Disaster Response Map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 <style>
   :root {
     --bg: #eef0f8; --surface: #ffffff; --surface-2: #f5f6fc; --sidebar: #e3e6f3;
@@ -36,10 +38,9 @@
   .nav a:hover { background: var(--accent-soft); }
   .nav a.active { background: var(--surface); border-left-color: var(--accent); font-weight: 700; color: var(--heading); }
 
-  /* Inventory agent panel */
   .agent { margin: 14px; padding: 12px 14px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
   .agent h4 { margin: 0 0 4px; font-size: 12px; color: var(--heading); display: flex; align-items: center; gap: 6px; }
-  .agent .live { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(47,182,124,.6); animation: pulse 2s infinite; }
+  .agent .live { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
   @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(47,182,124,.5);} 70%{box-shadow:0 0 0 6px rgba(47,182,124,0);} 100%{box-shadow:0 0 0 0 rgba(47,182,124,0);} }
   .agent .line { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; }
   .agent .line b { font-variant-numeric: tabular-nums; }
@@ -47,7 +48,7 @@
   .agent .msg { font-size: 11.5px; color: var(--muted); margin-top: 8px; border-top: 1px dashed var(--line); padding-top: 8px; line-height: 1.4; }
 
   main { position: relative; display: flex; flex-direction: column; min-width: 0; }
-  .topbar { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--line); z-index: 2; }
+  .topbar { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: var(--surface); border-bottom: 1px solid var(--line); z-index: 500; }
   .topbar h1 { margin: 0; font-size: 18px; color: var(--heading); }
   .pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
   .pill.warn { background: #fdf0d2; color: #9a6b00; }
@@ -56,25 +57,20 @@
   button.primary { background: var(--heading); border-color: var(--heading); color: #fff; }
   [data-theme="dark"] button.primary { background: var(--accent); border-color: var(--accent); color: #0d0f17; }
 
-  /* Hazard alert banner */
-  .alertbar { display: none; align-items: center; gap: 12px; padding: 10px 20px; background: #fff3f3; border-bottom: 1px solid #f3c6c8; color: #8a1f24; font-size: 13px; font-weight: 600; }
+  .alertbar { display: none; align-items: center; gap: 12px; padding: 10px 20px; background: #fff3f3; border-bottom: 1px solid #f3c6c8; color: #8a1f24; font-size: 13px; font-weight: 600; z-index: 500; }
   [data-theme="dark"] .alertbar { background: #2a1416; color: #ffb3b6; border-color: #4a2024; }
   .alertbar.show { display: flex; }
-  .alertbar svg { flex: 0 0 auto; }
 
   .maparea { position: relative; flex: 1; min-height: 0; }
-  #map { position: absolute; inset: 0; background: var(--surface-2); }
-  /* Fallback demo map (no Google key): a simple projected scatter) */
-  #fallback { position: absolute; inset: 0; display: none; }
-  #fallback.show { display: block; }
+  #map { position: absolute; inset: 0; background: var(--surface-2); z-index: 1; }
+  .leaflet-container { font: inherit; background: var(--surface-2); }
 
-  /* Legend + controls overlay */
-  .legend { position: absolute; left: 14px; bottom: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 12px; z-index: 3; }
+  .legend { position: absolute; left: 14px; bottom: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; box-shadow: var(--shadow); font-size: 12px; z-index: 600; }
   .legend .row { display: flex; align-items: center; gap: 7px; padding: 2px 0; }
   .legend .dot { width: 12px; height: 12px; border-radius: 50%; }
   .legend .zone { width: 14px; height: 14px; border-radius: 3px; background: rgba(229,72,77,.25); border: 1px solid var(--red); }
 
-  .route-panel { position: absolute; right: 14px; top: 14px; width: 300px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 14px; z-index: 3; }
+  .route-panel { position: absolute; right: 14px; top: 14px; width: 300px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 14px; z-index: 600; }
   .route-panel h3 { margin: 0 0 10px; font-size: 14px; color: var(--heading); }
   .route-panel label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
   .route-panel select, .route-panel input { width: 100%; margin: 4px 0 10px; }
@@ -82,19 +78,14 @@
   .route-result.show { display: block; }
   .route-result .big { font-size: 13px; font-weight: 700; color: var(--heading); }
   .route-result .safe { color: var(--green); font-weight: 700; } .route-result .risk { color: var(--red); font-weight: 700; }
-  .nokey { position: absolute; left: 50%; top: 16px; transform: translateX(-50%); background: #fff7e6; border: 1px solid #f0d08a; color: #7a5600; padding: 7px 14px; border-radius: 999px; font-size: 12px; z-index: 4; display: none; }
-  [data-theme="dark"] .nokey { background: #2e2512; color: #f2c25b; border-color: #574212; }
-  .nokey.show { display: block; }
 
-  /* popup / info card */
-  .gm-style .info b { color: var(--heading); }
   .fb-pop { font-family: Inter, sans-serif; font-size: 12.5px; max-width: 230px; }
-  .fb-pop h4 { margin: 0 0 2px; font-size: 13px; }
+  .fb-pop h4 { margin: 0 0 2px; font-size: 13px; color: var(--heading); }
   .fb-pop .st { display: inline-block; font-size: 10.5px; font-weight: 800; padding: 1px 7px; border-radius: 999px; text-transform: uppercase; margin-bottom: 6px; }
   .fb-pop .st.red { background: #fde2e3; color: #b42328; } .fb-pop .st.yellow { background: #fff0c9; color: #8a6400; } .fb-pop .st.green { background: #dff5ea; color: #1c7a4f; }
   .fb-pop ul { margin: 6px 0 0; padding-left: 16px; } .fb-pop li { margin: 1px 0; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--text); }
 </style>
-<script src="/config.js"></script>
 </head>
 <body>
 <div class="app">
@@ -131,9 +122,6 @@
 
     <div class="maparea">
       <div id="map"></div>
-      <svg id="fallback"></svg>
-
-      <div class="nokey" id="nokey">Demo map — add a Google Maps API key to load live map tiles &amp; driving routes</div>
 
       <div class="legend">
         <div class="row"><span class="dot" style="background:var(--red)"></span> High urgency / stockout</div>
@@ -155,21 +143,41 @@
   </main>
 </div>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <script>
 const $ = (s) => document.querySelector(s);
-const KEY = (window.AURA_CONFIG && window.AURA_CONFIG.googleMapsKey) || '';
+const cssv = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const STATUS_COLOR = { red: '#e5484d', yellow: '#f2b630', green: '#2fb67c', none: '#9aa3bd' };
-const CENTER = { lat: 37.33, lng: -122.03 };
-let MAP = null, MARKERS = [], ZONES = [], DATA = null, gmapsReady = false, routeLayer = null;
+const CENTER = [37.33, -122.03];
 
-/* ---------- data ---------- */
+let MAP = null, LAYER = null, ROUTE_LAYER = null, TILES = null, DATA = null, ZONES = [];
+// Standard OpenStreetMap tiles — completely free, no API key.
+const LIGHT_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const DARK_TILES = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+function initMap() {
+  MAP = L.map('map', { zoomControl: true, attributionControl: true }).setView(CENTER, 10);
+  setTiles();
+  LAYER = L.layerGroup().addTo(MAP);
+  ROUTE_LAYER = L.layerGroup().addTo(MAP);
+}
+function setTiles() {
+  const dark = document.documentElement.dataset.theme === 'dark';
+  if (TILES) MAP.removeLayer(TILES);
+  TILES = L.tileLayer(dark ? DARK_TILES : LIGHT_TILES, { attribution: ATTR, maxZoom: 19 }).addTo(MAP);
+  // OSM has no native dark tiles; invert them in dark mode for a dark basemap.
+  const pane = MAP.getPane('tilePane');
+  if (pane) pane.style.filter = dark ? 'invert(1) hue-rotate(180deg) brightness(.95) contrast(.9)' : '';
+}
+
 async function loadData() {
   const demo = await fetch('/api/demo').then(r => r.json());
   const body = { requests: demo.requests.join('\n'), offers: demo.offers.join('\n'), scenario: demo.scenario };
   DATA = await fetch('/api/map', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
   ZONES = DATA.hazards.zones;
-  renderAgent(); renderHazardBar(); populateSelectors();
-  if (gmapsReady) drawGoogle(); else drawFallback();
+  renderAgent(); renderHazardBar(); populateSelectors(); drawMarkers();
 }
 
 function renderAgent() {
@@ -183,57 +191,40 @@ function renderAgent() {
   $('#agentMsg').innerHTML = `Network coverage <b>${cov}</b>. ${DATA.inventory.critical_open} critical request(s) still open. ` +
     (b.stockout > 0 ? `<b style="color:var(--red)">${b.stockout} food bank(s) at stockout</b> — prioritize dispatch.` : 'No stockouts right now.');
 }
-
 function renderHazardBar() {
   $('#hazSource').textContent = 'hazards: ' + (DATA.hazards.source === 'nws-live' ? 'NWS live' : 'simulated');
-  const severe = ZONES.filter(z => ['Severe', 'Extreme'].includes(z.severity));
   const bar = $('#alertbar');
   if (ZONES.length) {
     bar.classList.add('show');
     $('#alertText').textContent = `${ZONES.length} active hazard${ZONES.length > 1 ? 's' : ''}: ` +
-      ZONES.map(z => z.event).join(', ') + (severe.length ? ' — suppliers: avoid affected corridors.' : '.');
+      ZONES.map(z => z.event).join(', ') + ' — suppliers: avoid affected corridors.';
   } else bar.classList.remove('show');
 }
-
 function populateSelectors() {
   const banks = [...DATA.markers].sort((a, b) => a.org.localeCompare(b.org));
   const opts = banks.map(m => `<option value="${m.org}">${m.org} (${m.city})</option>`).join('');
-  // Origins: suppliers are the orgs with surplus; default to Second Harvest (the main hub).
-  $('#originSel').innerHTML = opts;
-  $('#destSel').innerHTML = opts;
+  $('#originSel').innerHTML = opts; $('#destSel').innerHTML = opts;
   const hub = banks.find(m => m.org.startsWith('Second Harvest')); if (hub) $('#originSel').value = hub.org;
-  const neediest = DATA.markers[0]; if (neediest) $('#destSel').value = neediest.org;
+  if (DATA.markers[0]) $('#destSel').value = DATA.markers[0].org;
 }
 
-/* ---------- Google map ---------- */
-function initMap() {
-  gmapsReady = true;
-  MAP = new google.maps.Map($('#map'), {
-    center: CENTER, zoom: 10, mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
-    styles: document.documentElement.dataset.theme === 'dark' ? DARK_STYLE : [],
-  });
-  routeLayer = new google.maps.DirectionsRenderer({ map: MAP, suppressMarkers: true, polylineOptions: { strokeColor: '#7c6ff0', strokeWeight: 6 } });
-  if (DATA) drawGoogle();
-}
-window.initMap = initMap;
-
-function drawGoogle() {
-  MARKERS.forEach(m => m.setMap(null)); MARKERS = [];
-  DATA.markers.forEach(m => {
-    const marker = new google.maps.Marker({
-      position: { lat: m.lat, lng: m.lon }, map: MAP, title: m.org,
-      icon: { path: google.maps.SymbolPath.CIRCLE, scale: m.status === 'red' ? 9 : 7, fillColor: STATUS_COLOR[m.status], fillOpacity: 0.95, strokeColor: '#fff', strokeWeight: 1.5 },
-    });
-    const info = new google.maps.InfoWindow({ content: popupHTML(m) });
-    marker.addListener('click', () => info.open(MAP, marker));
-    MARKERS.push(marker);
-  });
+function drawMarkers() {
+  LAYER.clearLayers();
+  const bounds = [];
   ZONES.forEach(z => {
-    const sevColor = z.severity === 'Extreme' || z.severity === 'Severe' ? '#e5484d' : '#f2b630';
-    MARKERS.push(new google.maps.Circle({ map: MAP, center: { lat: z.lat, lng: z.lon }, radius: z.radius_km * 1000, fillColor: sevColor, fillOpacity: 0.12, strokeColor: sevColor, strokeOpacity: 0.6, strokeWeight: 1.5 }));
+    const col = ['Severe', 'Extreme'].includes(z.severity) ? '#e5484d' : '#f2b630';
+    L.circle([z.lat, z.lon], { radius: z.radius_km * 1000, color: col, weight: 1.5, opacity: 0.6, fillColor: col, fillOpacity: 0.12 })
+      .bindTooltip(`${z.event} (${z.severity})`).addTo(LAYER);
   });
+  DATA.markers.forEach(m => {
+    const marker = L.circleMarker([m.lat, m.lon], {
+      radius: m.status === 'red' ? 9 : 7, color: '#fff', weight: 1.5,
+      fillColor: STATUS_COLOR[m.status], fillOpacity: 0.95,
+    }).bindPopup(popupHTML(m)).bindTooltip(m.org).addTo(LAYER);
+    bounds.push([m.lat, m.lon]);
+  });
+  if (bounds.length) MAP.fitBounds(bounds, { padding: [50, 50] });
 }
-
 function popupHTML(m) {
   const items = m.items.map(i => `<li>${i.item} — ${Math.round(i.unmet)} unmet (${i.urgency})</li>`).join('');
   const cov = m.coverage == null ? 'no open demand' : Math.round(m.coverage * 100) + '% covered';
@@ -241,102 +232,54 @@ function popupHTML(m) {
     <div>${m.city} · ${cov}</div>${items ? `<ul>${items}</ul>` : ''}</div>`;
 }
 
-/* ---------- Fallback demo map (no key) ---------- */
-function drawFallback() {
-  $('#nokey').classList.add('show');
-  const svg = $('#fallback'); svg.classList.add('show');
-  const W = svg.clientWidth || 900, H = svg.clientHeight || 600;
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = '';
-  const lats = DATA.markers.map(m => m.lat), lons = DATA.markers.map(m => m.lon);
-  const pad = 0.06, minLa = Math.min(...lats) - pad, maxLa = Math.max(...lats) + pad, minLo = Math.min(...lons) - pad, maxLo = Math.max(...lons) + pad;
-  const X = lo => ((lo - minLo) / (maxLo - minLo)) * (W - 80) + 40;
-  const Y = la => (1 - (la - minLa) / (maxLa - minLa)) * (H - 80) + 40;
-  const ns = 'http://www.w3.org/2000/svg';
-  const bg = document.createElementNS(ns, 'rect'); bg.setAttribute('width', W); bg.setAttribute('height', H); bg.setAttribute('fill', 'var(--surface-2)'); svg.appendChild(bg);
-  ZONES.forEach(z => {
-    const r = Math.abs(X(z.lon + z.radius_km / 88) - X(z.lon));
-    const c = document.createElementNS(ns, 'circle'); c.setAttribute('cx', X(z.lon)); c.setAttribute('cy', Y(z.lat)); c.setAttribute('r', r);
-    const col = ['Severe', 'Extreme'].includes(z.severity) ? '#e5484d' : '#f2b630';
-    c.setAttribute('fill', col); c.setAttribute('fill-opacity', '0.12'); c.setAttribute('stroke', col); c.setAttribute('stroke-opacity', '0.6'); svg.appendChild(c);
-  });
-  DATA.markers.forEach(m => {
-    const c = document.createElementNS(ns, 'circle'); c.setAttribute('cx', X(m.lon)); c.setAttribute('cy', Y(m.lat));
-    c.setAttribute('r', m.status === 'red' ? 7 : 5.5); c.setAttribute('fill', STATUS_COLOR[m.status]); c.setAttribute('stroke', '#fff'); c.setAttribute('stroke-width', '1.5');
-    c.style.cursor = 'pointer';
-    const t = document.createElementNS(ns, 'title'); t.textContent = `${m.org} — ${m.stock_level} (${m.city})`; c.appendChild(t);
-    svg.appendChild(c);
-  });
-}
-
 /* ---------- routing ---------- */
 async function findRoute() {
-  const originOrg = $('#originSel').value, destOrg = $('#destSel').value;
-  if (originOrg === destOrg) { showRoute({ error: 'Pick a different start and destination.' }); return; }
-  const o = DATA.markers.find(m => m.org === originOrg), d = DATA.markers.find(m => m.org === destOrg);
+  const o = DATA.markers.find(m => m.org === $('#originSel').value);
+  const d = DATA.markers.find(m => m.org === $('#destSel').value);
+  if (o.org === d.org) { showRoute({ error: 'Pick a different start and destination.' }); return; }
   $('#routeBtn').disabled = true; $('#routeBtn').textContent = 'Finding…';
   try {
     const r = await fetch('/api/route', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ origin: [o.lat, o.lon], dest: [d.lat, d.lon] }) }).then(x => x.json());
-    showRoute(r, o, d);
-    if (gmapsReady) drawRouteOnMap(r, o, d);
+    showRoute(r, o, d); drawRoute(r, o, d);
   } catch (e) { showRoute({ error: e.message }); }
   finally { $('#routeBtn').disabled = false; $('#routeBtn').textContent = 'Find safest route'; }
 }
-
 function showRoute(r, o, d) {
   const box = $('#routeResult'); box.classList.add('show');
   if (r.error) { box.innerHTML = `<span class="risk">${r.error}</span>`; return; }
-  const c = r.chosen, danger = c.danger;
-  const safe = danger.clear;
+  const c = r.chosen, safe = c.danger.clear;
   box.innerHTML = `
     <div class="big">${o.org.split(' ').slice(0,3).join(' ')} <svg width="16" height="9" viewBox="0 0 16 9" style="vertical-align:middle"><path d="M0 4.5h12M9 1l3 3.5-3 3.5" stroke="var(--accent)" stroke-width="1.8" fill="none"/></svg> ${d.org.split(' ').slice(0,3).join(' ')}</div>
     <div>${c.distance}${c.duration !== '—' ? ' · ' + c.duration : ''}</div>
-    <div style="margin-top:6px">${safe ? '<span class="safe">Clear of active danger zones</span>' : '<span class="risk">Crosses hazard: ' + danger.zones_crossed.map(z => z.event).join(', ') + '</span>'}</div>
+    <div style="margin-top:6px">${safe ? '<span class="safe">Clear of active danger zones</span>' : '<span class="risk">Crosses hazard: ' + c.danger.zones_crossed.map(z => z.event).join(', ') + '</span>'}</div>
     ${r.avoided_danger ? '<div class="safe" style="margin-top:4px">Rerouted around a more dangerous path.</div>' : ''}
     <div style="color:var(--muted);margin-top:6px">${r.note}</div>`;
 }
-
-function drawRouteOnMap(r, o, d) {
-  if (r.chosen.polyline) {
-    const path = google.maps.geometry.encoding.decodePath(r.chosen.polyline);
-    if (window._routePoly) window._routePoly.setMap(null);
-    window._routePoly = new google.maps.Polyline({ path, map: MAP, strokeColor: '#7c6ff0', strokeWeight: 6, strokeOpacity: 0.9 });
-    const b = new google.maps.LatLngBounds(); path.forEach(p => b.extend(p)); MAP.fitBounds(b);
+function drawRoute(r, o, d) {
+  ROUTE_LAYER.clearLayers();
+  const path = r.chosen.path;  // [[lat, lon], ...]
+  if (path && path.length) {
+    const line = L.polyline(path, { color: cssv('--accent'), weight: 6, opacity: 0.9 }).addTo(ROUTE_LAYER);
+    L.marker([o.lat, o.lon]).bindTooltip('Start: ' + o.org, { permanent: false }).addTo(ROUTE_LAYER);
+    MAP.fitBounds(line.getBounds(), { padding: [60, 60] });
   }
 }
 
 /* ---------- theme ---------- */
-const DARK_STYLE = [
-  { elementType: 'geometry', stylers: [{ color: '#1f2333' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#1f2333' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#8e95b3' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#11131c' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2a2f43' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-];
 function syncThemeBtn() { $('#themeBtn').textContent = document.documentElement.dataset.theme === 'dark' ? 'Light mode' : 'Dark mode'; }
 $('#themeBtn').onclick = () => {
   const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-  document.documentElement.dataset.theme = t; localStorage.setItem('aura-theme', t); syncThemeBtn();
-  if (gmapsReady && MAP) { MAP.setOptions({ styles: t === 'dark' ? DARK_STYLE : [] }); } else if (DATA) drawFallback();
+  document.documentElement.dataset.theme = t; localStorage.setItem('aura-theme', t); syncThemeBtn(); setTiles();
 };
 document.documentElement.dataset.theme = localStorage.getItem('aura-theme') || 'light';
 syncThemeBtn();
-
 $('#refresh').onclick = loadData;
 $('#routeBtn').onclick = findRoute;
 
 /* ---------- boot ---------- */
+initMap();
 loadData();
-if (KEY) {
-  const s = document.createElement('script');
-  s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(KEY)}&libraries=geometry&callback=initMap`;
-  s.async = true; s.onerror = () => { $('#nokey').classList.add('show'); drawFallback(); };
-  document.head.appendChild(s);
-} else {
-  // No key: demo fallback map.
-  window.addEventListener('load', () => { if (DATA) drawFallback(); });
-}
 </script>
 </body>
 </html>

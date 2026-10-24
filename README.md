@@ -23,20 +23,12 @@ zones overlaid, an inventory agent summary, and a safest-route finder for
 suppliers. **Network Analytics** (the charts dashboard) is one tab over, and the
 original paste view is at `/classic`.
 
-### Google Maps setup (optional — the map runs in demo mode without it)
+### Map — no API key needed
 
-The map shows food bank locations, colors, hazards, and a straight-line route
-assessment **with no key**. To get real Google map tiles and real driving
-routes, add a key:
-
-1. Copy the template: `cp .env.example .env`
-2. Put your key in `.env`: `GOOGLE_MAPS_API_KEY=AIza...`
-3. Restart the server.
-
-`.env` is gitignored and must never be committed. The server reads the key at
-runtime and injects it into the page via `/config.js`, so it stays out of the
-repo. Restrict the key in Google Cloud Console (HTTP referrers + Maps
-JavaScript / Directions / Geocoding APIs only).
+The map uses **Leaflet + OpenStreetMap** for tiles and the free, keyless
+**OSRM** service for driving routes. There is **no API key, no billing, and no
+credit card** — it works out of the box. (An internet connection is needed to
+load map tiles and routes.)
 
 Hazard alerts come from the free, keyless U.S. National Weather Service. Set
 `AURA_LIVE_HAZARDS=1` in `.env` to use live alerts instead of the simulated set.
