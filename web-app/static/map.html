@@ -160,7 +160,7 @@ const $ = (s) => document.querySelector(s);
 const KEY = (window.AURA_CONFIG && window.AURA_CONFIG.googleMapsKey) || '';
 const STATUS_COLOR = { red: '#e5484d', yellow: '#f2b630', green: '#2fb67c', none: '#9aa3bd' };
 const CENTER = { lat: 37.33, lng: -122.03 };
-let MAP = null, MARKERS = [], ZONES = [], DATA = null, gmapsReady = false, routeLayer = null;
+let MAP = null, MARKERS = [], ZONES = [], DATA = null, gmapsReady = false, gmapsFailed = false;
 
 /* ---------- data ---------- */
 async function loadData() {
@@ -169,7 +169,27 @@ async function loadData() {
   DATA = await fetch('/api/map', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json());
   ZONES = DATA.hazards.zones;
   renderAgent(); renderHazardBar(); populateSelectors();
-  if (gmapsReady) drawGoogle(); else drawFallback();
+  render();
+}
+
+// Decide which map to draw. With a key we wait for Google and NEVER show the
+// fallback; only fall back if there is no key (or Google failed to load).
+function render() {
+  if (!DATA) return;
+  if (gmapsReady && MAP) {
+    hideFallback();
+    drawGoogle();
+  } else if (!KEY || gmapsFailed) {
+    drawFallback();
+  }
+  // If a key exists but Google isn't ready yet, do nothing — initMap() will
+  // call render() again once the map is live.
+}
+
+function hideFallback() {
+  $('#fallback').classList.remove('show');
+  $('#fallback').innerHTML = '';
+  $('#nokey').classList.remove('show');
 }
 
 function renderAgent() {
@@ -212,13 +232,14 @@ function initMap() {
     center: CENTER, zoom: 10, mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
     styles: document.documentElement.dataset.theme === 'dark' ? DARK_STYLE : [],
   });
-  routeLayer = new google.maps.DirectionsRenderer({ map: MAP, suppressMarkers: true, polylineOptions: { strokeColor: '#7c6ff0', strokeWeight: 6 } });
-  if (DATA) drawGoogle();
+  hideFallback();
+  render();
 }
 window.initMap = initMap;
 
 function drawGoogle() {
   MARKERS.forEach(m => m.setMap(null)); MARKERS = [];
+  const bounds = new google.maps.LatLngBounds();
   DATA.markers.forEach(m => {
     const marker = new google.maps.Marker({
       position: { lat: m.lat, lng: m.lon }, map: MAP, title: m.org,
@@ -227,11 +248,14 @@ function drawGoogle() {
     const info = new google.maps.InfoWindow({ content: popupHTML(m) });
     marker.addListener('click', () => info.open(MAP, marker));
     MARKERS.push(marker);
+    bounds.extend({ lat: m.lat, lng: m.lon });
   });
   ZONES.forEach(z => {
     const sevColor = z.severity === 'Extreme' || z.severity === 'Severe' ? '#e5484d' : '#f2b630';
     MARKERS.push(new google.maps.Circle({ map: MAP, center: { lat: z.lat, lng: z.lon }, radius: z.radius_km * 1000, fillColor: sevColor, fillOpacity: 0.12, strokeColor: sevColor, strokeOpacity: 0.6, strokeWeight: 1.5 }));
   });
+  // Center and zoom to fit all food banks (fixes the wrong map center).
+  if (!bounds.isEmpty()) MAP.fitBounds(bounds, 48);
 }
 
 function popupHTML(m) {
@@ -318,7 +342,7 @@ function syncThemeBtn() { $('#themeBtn').textContent = document.documentElement.
 $('#themeBtn').onclick = () => {
   const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
   document.documentElement.dataset.theme = t; localStorage.setItem('aura-theme', t); syncThemeBtn();
-  if (gmapsReady && MAP) { MAP.setOptions({ styles: t === 'dark' ? DARK_STYLE : [] }); } else if (DATA) drawFallback();
+  if (gmapsReady && MAP) MAP.setOptions({ styles: t === 'dark' ? DARK_STYLE : [] }); else render();
 };
 document.documentElement.dataset.theme = localStorage.getItem('aura-theme') || 'light';
 syncThemeBtn();
@@ -329,13 +353,15 @@ $('#routeBtn').onclick = findRoute;
 /* ---------- boot ---------- */
 loadData();
 if (KEY) {
+  // A key is present: load Google Maps. initMap() will render once it's ready.
   const s = document.createElement('script');
   s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(KEY)}&libraries=geometry&callback=initMap`;
-  s.async = true; s.onerror = () => { $('#nokey').classList.add('show'); drawFallback(); };
+  s.async = true;
+  s.onerror = () => { gmapsFailed = true; render(); };  // key bad / offline -> demo map
   document.head.appendChild(s);
 } else {
-  // No key: demo fallback map.
-  window.addEventListener('load', () => { if (DATA) drawFallback(); });
+  // No key at all: demo fallback map once data is in.
+  gmapsFailed = true;
 }
 </script>
 </body>
