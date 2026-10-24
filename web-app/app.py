@@ -18,18 +18,43 @@ Run in production (as the container does):
 """
 from __future__ import annotations
 
+import json
 import os
 
 from flask import Flask, jsonify, request, send_from_directory
 
+import engine
 from pipeline import bedrock_available, parse_pasted_text, process_messages
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
 
 @app.get("/")
-def index():
+@app.get("/dashboard")
+def dashboard():
+    return send_from_directory(app.static_folder, "dashboard.html")
+
+
+@app.get("/classic")
+def classic():
     return send_from_directory(app.static_folder, "index.html")
+
+
+@app.get("/api/demo")
+def demo():
+    return send_from_directory(app.static_folder, "demo_scenario.json")
+
+
+@app.post("/api/dashboard")
+def api_dashboard():
+    payload = request.get_json(silent=True) or {}
+    try:
+        result = engine.run(
+            payload.get("requests", ""), payload.get("offers", ""), payload.get("scenario")
+        )
+        return app.response_class(json.dumps(result, default=str), mimetype="application/json")
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"error": str(exc)}), 500
 
 
 @app.get("/sample")

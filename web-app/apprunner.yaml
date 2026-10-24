@@ -17,4 +17,4 @@ run:
     - name: BEDROCK_MODEL_ID
       value: anthropic.claude-sonnet-4-6
     - name: USE_BEDROCK
-      value: "auto"
+      value: "1"

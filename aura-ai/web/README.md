@@ -15,7 +15,7 @@ cd aura-ai/web
 python server.py
 
 # With live Bedrock extraction (needs AWS auth + model access):
-PYTHONPATH=../../app python server.py
+USE_BEDROCK=1 python server.py
 ```
 
 Then open **http://localhost:8000** in your browser.
