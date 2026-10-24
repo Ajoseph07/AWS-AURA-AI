@@ -12,9 +12,15 @@ run:
   network:
     port: 8000
   env:
-    - name: AWS_REGION
-      value: us-east-1
-    - name: BEDROCK_MODEL_ID
-      value: anthropic.claude-sonnet-4-6
+    # Rules-based extraction by default: no IAM role or Bedrock access required,
+    # the demo works out of the box. To enable live Bedrock, attach an instance
+    # role with bedrock:InvokeModel and set USE_BEDROCK=1.
     - name: USE_BEDROCK
-      value: "1"
+      value: "0"
+    - name: BEDROCK_REGION
+      value: us-east-2
+    - name: BEDROCK_MODEL_ID
+      value: us.anthropic.claude-haiku-4-5-20251001-v1:0
+    # Hazard alerts: "1" for live National Weather Service, "0" for simulated.
+    - name: AURA_LIVE_HAZARDS
+      value: "0"

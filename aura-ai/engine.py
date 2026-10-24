@@ -82,7 +82,12 @@ def _bedrock_parse_batch(lines: list[str], kind: str) -> list[dict | None]:
     try:
         import boto3
 
-        client = boto3.client("bedrock-runtime", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+        # Use the same Bedrock region + model that bedrock_client.py uses, so a
+        # single config works everywhere. Defaults to the confirmed-working
+        # Claude Haiku inference profile in us-east-2.
+        region = os.environ.get("BEDROCK_REGION", os.environ.get("AWS_REGION", "us-east-2"))
+        model = os.environ.get("BEDROCK_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
+        client = boto3.client("bedrock-runtime", region_name=region)
         numbered = "\n".join(f"{i}. {line}" for i, line in enumerate(lines))
         prompt = (
             f"Each numbered line is a food-bank {kind} in the form 'Organization | message'.\n"
@@ -93,7 +98,7 @@ def _bedrock_parse_batch(lines: list[str], kind: str) -> list[dict | None]:
             "urgency (critical|high|medium|low), expiry_days (integer or null)."
         )
         resp = client.converse(
-            modelId=os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-sonnet-4-6"),
+            modelId=model,
             messages=[{"role": "user", "content": [{"text": prompt}]}],
             inferenceConfig={"maxTokens": 4000, "temperature": 0},
         )

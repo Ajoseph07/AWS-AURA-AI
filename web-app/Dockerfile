@@ -5,7 +5,10 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PORT=8000 \
-    AWS_REGION=us-east-1
+    USE_BEDROCK=0 \
+    BEDROCK_REGION=us-east-2 \
+    BEDROCK_MODEL_ID=us.anthropic.claude-haiku-4-5-20251001-v1:0 \
+    AURA_LIVE_HAZARDS=0
 
 WORKDIR /app
 
