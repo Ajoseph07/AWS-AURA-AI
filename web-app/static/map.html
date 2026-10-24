@@ -253,7 +253,9 @@ function showRoute(r, o, d) {
     <div class="big">${o.org.split(' ').slice(0,3).join(' ')} <svg width="16" height="9" viewBox="0 0 16 9" style="vertical-align:middle"><path d="M0 4.5h12M9 1l3 3.5-3 3.5" stroke="var(--accent)" stroke-width="1.8" fill="none"/></svg> ${d.org.split(' ').slice(0,3).join(' ')}</div>
     <div>${c.distance}${c.duration !== '—' ? ' · ' + c.duration : ''}</div>
     <div style="margin-top:6px">${safe ? '<span class="safe">Clear of active danger zones</span>' : '<span class="risk">Crosses hazard: ' + c.danger.zones_crossed.map(z => z.event).join(', ') + '</span>'}</div>
-    ${r.avoided_danger ? '<div class="safe" style="margin-top:4px">Rerouted around a more dangerous path.</div>' : ''}
+    ${r.blocked ? '<div class="risk" style="margin-top:4px;font-weight:700">Do not dispatch: route enters an active tornado or severe flood zone.</div>' : ''}
+    ${r.detoured ? '<div class="safe" style="margin-top:4px">Detoured around an active tornado / severe flood zone.</div>' : ''}
+    ${r.avoided_danger && !r.detoured ? '<div class="safe" style="margin-top:4px">Rerouted around a more dangerous path.</div>' : ''}
     <div style="color:var(--muted);margin-top:6px">${r.note}</div>`;
 }
 function drawRoute(r, o, d) {

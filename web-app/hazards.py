@@ -29,6 +29,23 @@ BBOX = {"min_lat": 36.9, "max_lat": 37.75, "min_lon": -122.55, "max_lon": -121.4
 SEVERITY_RANK = {"Extreme": 4, "Severe": 3, "Moderate": 2, "Minor": 1, "Unknown": 1}
 
 
+def must_avoid(zone: dict) -> bool:
+    """True if a delivery route must detour around this hazard, not just pass with caution.
+
+    Active tornadoes and severe flooding make roads deadly or impassable, so the
+    router goes around them even when that adds time. A Tornado *Watch* only means
+    conditions are possible, so it stays a caution zone. Other alerts (wind, heat,
+    minor flooding) also stay caution zones.
+    """
+    event = (zone.get("event") or "").lower()
+    severity = zone.get("severity", "Unknown")
+    if "tornado" in event and ("warning" in event or "emergency" in event):
+        return True
+    if "flood" in event and (severity in ("Severe", "Extreme") or "emergency" in event):
+        return True
+    return False
+
+
 def _within_bbox(lat: float, lon: float) -> bool:
     return (BBOX["min_lat"] <= lat <= BBOX["max_lat"]
             and BBOX["min_lon"] <= lon <= BBOX["max_lon"])
