@@ -46,6 +46,17 @@ python demo.py --offline
 PYTHONPATH=../app python demo.py
 ```
 
+### Prefer a web UI?
+
+There's also a browser-based UI — paste messages and see the plan rendered live:
+
+```bash
+cd foodbridge/web
+python server.py          # then open http://localhost:8000
+```
+
+See `web/README.md` for details.
+
 The demo prints three sections:
 1. **Organized messages** — every message parsed into structured fields.
 2. **Proposed transfer plan** — ranked transfers (`from_org -> to_org`), with
