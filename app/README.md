@@ -1,30 +1,30 @@
 # AURA-AI Bedrock App
 
-A Python app that connects the three DynamoDB tables to Amazon Bedrock.
+A small, stateless Python app that sends a prompt to Amazon Bedrock and returns
+the response. No database involved — the prompt comes in on the event and the
+answer goes out in the response.
 
 **Flow:**
-1. Read a request from **`AuraRequests`** (by `requestId`)
-2. Send its `prompt` to Bedrock using **`anthropic.claude-sonnet-4-6`** (Converse API)
-3. Write the response to **`AuraResources`**
-4. On failure, log an entry to **`AuraAlerts`**
+1. Receive an event with a `prompt`
+2. Send it to Bedrock using **`anthropic.claude-sonnet-4-6`** (Converse API)
+3. Return the generated response
 
 ## Files
 
 | File | Purpose |
 | ---- | ------- |
-| `handler.py` | Lambda entry point (`handler.handler`) running the full flow |
+| `handler.py` | Lambda entry point (`handler.handler`) |
 | `bedrock_client.py` | Reusable Bedrock Converse wrapper |
-| `local_test.py` | Run the flow locally without deploying |
-| `iam-policy.json` | Permissions the function needs (Bedrock + DynamoDB) |
+| `local_test.py` | Run it locally without deploying |
+| `iam-policy.json` | Permissions the function needs (Bedrock only) |
 | `requirements.txt` | Dependencies (`boto3`) |
 
 ## Prerequisites
 
-1. The three DynamoDB tables exist (see `../infrastructure/`).
-2. **Bedrock model access is enabled** for `anthropic.claude-sonnet-4-6`
+1. **Bedrock model access is enabled** for `anthropic.claude-sonnet-4-6`
    (Console → Bedrock → *Model access*). Without this you get `AccessDeniedException`.
-3. You are running from an AWS-authenticated terminal or **AWS CloudShell**.
-4. Region is `us-east-1`.
+2. You are running from an AWS-authenticated terminal or **AWS CloudShell**.
+3. Region is `us-east-1`.
 
 ## Configuration (environment variables)
 
@@ -32,9 +32,6 @@ A Python app that connects the three DynamoDB tables to Amazon Bedrock.
 | -------- | ------- |
 | `BEDROCK_MODEL_ID` | `anthropic.claude-sonnet-4-6` |
 | `AWS_REGION` | `us-east-1` |
-| `REQUESTS_TABLE` | `AuraRequests` |
-| `RESOURCES_TABLE` | `AuraResources` |
-| `ALERTS_TABLE` | `AuraAlerts` |
 | `SYSTEM_PROMPT` | `You are AURA-AI, a concise and helpful assistant.` |
 
 ## Run locally (quickest way to test)
@@ -43,15 +40,10 @@ A Python app that connects the three DynamoDB tables to Amazon Bedrock.
 cd app
 pip install -r requirements.txt
 
-# Seed a new request and run the whole flow:
-python local_test.py --seed --prompt "Summarize what AURA-AI does"
-
-# Or process an existing request already in AuraRequests:
-python local_test.py --request-id req-123
+python local_test.py --prompt "Summarize what AURA-AI does"
 ```
 
-Expected output is a JSON blob with `statusCode: 200`, the generated
-`response`, and the new `resourceId` written to `AuraResources`.
+Expected output is a JSON blob with `statusCode: 200` and the generated `response`.
 
 ## Deploy as a Lambda function
 
@@ -79,14 +71,8 @@ aws lambda create-function \
 # 4. Invoke it
 aws lambda invoke \
   --function-name aura-ai-processor \
-  --payload '{"requestId":"req-123"}' \
+  --payload '{"prompt":"Say hello from AURA-AI"}' \
   --cli-binary-format raw-in-base64-out \
   --region us-east-1 \
   out.json && cat out.json
-```
-
-## Verify results
-
-```bash
-aws dynamodb scan --table-name AuraResources --region us-east-1
 ```
