@@ -1,1 +1,11 @@
 .aws/
+
+# Python
+__pycache__/
+*.pyc
+
+# Build artifacts
+app/package/
+app/function.zip
+out.json
+output.json
