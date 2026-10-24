@@ -20,9 +20,38 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 # Make the sibling pipeline modules importable (aura-ai/).
 AURA_AI_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, AURA_AI_DIR)
+REPO_ROOT = os.path.dirname(AURA_AI_DIR)
+
+
+def _load_dotenv() -> None:
+    """Load KEY=VALUE pairs from a .env at the repo root into os.environ.
+
+    Values already set in the real environment win (so a shell export or an
+    App Runner config variable overrides the file). Keeps the key out of git:
+    .env is gitignored; only .env.example is committed.
+    """
+    path = os.path.join(REPO_ROOT, ".env")
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key, value = key.strip(), value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
+_load_dotenv()
 
 import engine  # noqa: E402
+import hazards as hazards_mod  # noqa: E402
+import mapdata  # noqa: E402
+import routing  # noqa: E402
 from extractor import extract  # noqa: E402
+from geo import coords_for  # noqa: E402
 from matcher import build_transfer_plan  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -108,12 +137,24 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):  # noqa: N802
         route = self.path.split("?", 1)[0]
-        if route in ("/", "/dashboard", "/dashboard.html"):
+        if route in ("/", "/map", "/map.html"):
+            # The map is the default landing view.
+            self._file(os.path.join(HERE, "map.html"), "text/html; charset=utf-8")
+        elif route in ("/dashboard", "/dashboard.html"):
             self._file(os.path.join(HERE, "dashboard.html"), "text/html; charset=utf-8")
         elif route in ("/classic", "/index.html"):
             self._file(os.path.join(HERE, "index.html"), "text/html; charset=utf-8")
+        elif route == "/config.js":
+            # Injects the Maps key from the environment so it is never committed.
+            key = os.environ.get("GOOGLE_MAPS_API_KEY", "")
+            body = f"window.AURA_CONFIG = {{ googleMapsKey: {json.dumps(key)} }};"
+            self._send(200, body.encode("utf-8"), "application/javascript")
         elif route == "/api/demo":
             self._file(os.path.join(AURA_AI_DIR, "demo_scenario.json"), "application/json")
+        elif route == "/api/hazards":
+            prefer_live = self.path.endswith("live=1") or os.environ.get("AURA_LIVE_HAZARDS") == "1"
+            haz = hazards_mod.get_hazards(prefer_live)
+            self._send(200, json.dumps(haz).encode("utf-8"), "application/json")
         elif route == "/sample":
             # Bundled sample messages for the classic view.
             self._file(os.path.join(AURA_AI_DIR, "sample_messages.json"), "application/json")
@@ -132,6 +173,33 @@ class Handler(BaseHTTPRequestHandler):
                     payload.get("scenario"),
                 )
                 self._send(200, json.dumps(result, default=str).encode("utf-8"), "application/json")
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, json.dumps({"error": str(exc)}).encode("utf-8"), "application/json")
+            return
+
+        if self.path == "/api/map":
+            try:
+                result = mapdata.build_map(
+                    payload.get("requests", ""),
+                    payload.get("offers", ""),
+                    payload.get("scenario"),
+                    payload.get("live_hazards"),
+                )
+                self._send(200, json.dumps(result, default=str).encode("utf-8"), "application/json")
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, json.dumps({"error": str(exc)}).encode("utf-8"), "application/json")
+            return
+
+        if self.path == "/api/route":
+            try:
+                origin = tuple(payload["origin"])  # [lat, lon]
+                dest = payload.get("dest")
+                if dest is None and payload.get("dest_org"):
+                    dest = list(coords_for(payload["dest_org"], payload.get("dest_city", "")))
+                haz = hazards_mod.get_hazards(payload.get("live_hazards"))
+                route = routing.safest_route(origin, tuple(dest), haz["zones"])
+                route["hazards"] = haz
+                self._send(200, json.dumps(route, default=str).encode("utf-8"), "application/json")
             except Exception as exc:  # noqa: BLE001
                 self._send(500, json.dumps({"error": str(exc)}).encode("utf-8"), "application/json")
             return
