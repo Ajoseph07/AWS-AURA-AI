@@ -1,4 +1,4 @@
-"""FoodBridge five-minute demo.
+"""AURA AI five-minute demo.
 
 Loads ~30 informal offer/request messages, uses Bedrock to extract structured
 data, runs the deterministic matcher, and prints a proposed transfer plan plus
@@ -50,7 +50,7 @@ def banner(title: str) -> None:
 def run(path: str, use_bedrock: bool) -> int:
     raw_messages = load_messages(path)
 
-    banner(f"FoodBridge — processing {len(raw_messages)} partner messages")
+    banner(f"AURA AI — processing {len(raw_messages)} partner messages")
     mode = "Bedrock extraction" if use_bedrock else "offline keyword extraction"
     print(f"Extraction mode: {mode}\n")
 
@@ -98,7 +98,7 @@ def run(path: str, use_bedrock: bool) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="FoodBridge demo")
+    parser = argparse.ArgumentParser(description="AURA AI demo")
     parser.add_argument(
         "--file",
         default=os.path.join(HERE, "sample_messages.json"),

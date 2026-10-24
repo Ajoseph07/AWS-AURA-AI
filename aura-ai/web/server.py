@@ -1,10 +1,10 @@
-"""FoodBridge web UI server.
+"""AURA AI web UI server.
 
 A zero-dependency web server (Python standard library only) that serves a
-single-page UI and exposes the FoodBridge pipeline over HTTP.
+single-page UI and exposes the AURA AI pipeline over HTTP.
 
 Run:
-    cd foodbridge/web
+    cd aura-ai/web
     python server.py                 # offline extraction, http://localhost:8000
     PYTHONPATH=../../app python server.py   # with live Bedrock extraction
 
@@ -17,9 +17,9 @@ import os
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-# Make the sibling pipeline modules importable (foodbridge/).
-FOODBRIDGE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, FOODBRIDGE_DIR)
+# Make the sibling pipeline modules importable (aura-ai/).
+AURA_AI_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, AURA_AI_DIR)
 
 from extractor import extract  # noqa: E402
 from matcher import build_transfer_plan  # noqa: E402
@@ -107,7 +107,7 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(200, f.read(), "text/html; charset=utf-8")
         elif self.path == "/sample":
             # Serve the bundled 30 sample messages so the demo is one click.
-            with open(os.path.join(FOODBRIDGE_DIR, "sample_messages.json"), "rb") as f:
+            with open(os.path.join(AURA_AI_DIR, "sample_messages.json"), "rb") as f:
                 self._send(200, f.read(), "application/json")
         else:
             self._send(404, b"Not found", "text/plain")
@@ -141,7 +141,7 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> None:
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     mode = "Bedrock" if _bedrock_available() else "offline"
-    print(f"FoodBridge web UI running on http://localhost:{PORT}  (extraction: {mode})")
+    print(f"AURA AI web UI running on http://localhost:{PORT}  (extraction: {mode})")
     print("Press Ctrl+C to stop.")
     try:
         server.serve_forever()

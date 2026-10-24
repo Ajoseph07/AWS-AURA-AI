@@ -1,4 +1,4 @@
-"""Deterministic matching engine for FoodBridge.
+"""Deterministic matching engine for AURA AI.
 
 The LLM proposes structure; THIS code verifies and decides. It never trusts the
 model for the hard constraints that matter for safety and feasibility:

@@ -1,4 +1,4 @@
-# FoodBridge — AI Food Bank Mutual-Aid Exchange
+# AURA AI — AI Food Bank Mutual-Aid Exchange
 
 **Best multi-organization collaboration**
 
@@ -9,7 +9,7 @@
 > meals while a nearby organization sits on surplus stock — and nobody can
 > coordinate a transfer across organizations efficiently.
 
-FoodBridge is an AI-powered exchange connecting food banks, pantries, kitchens,
+AURA AI is an AI-powered exchange connecting food banks, pantries, kitchens,
 and approved community partners.
 
 ## How it works
@@ -32,11 +32,11 @@ and approved community partners.
 
 ## Five-minute demo
 
-Paste ~30 offer/request messages and watch FoodBridge organize them, identify
+Paste ~30 offer/request messages and watch AURA AI organize them, identify
 candidate matches, and generate a proposed transfer plan.
 
 ```bash
-cd foodbridge
+cd aura-ai
 
 # Run entirely offline — no AWS needed (great for rehearsing the demo):
 python demo.py --offline
@@ -51,7 +51,7 @@ PYTHONPATH=../app python demo.py
 There's also a browser-based UI — paste messages and see the plan rendered live:
 
 ```bash
-cd foodbridge/web
+cd aura-ai/web
 python server.py          # then open http://localhost:8000
 ```
 
@@ -94,7 +94,7 @@ enforced by `matcher.py` when set.
 
 ## Statelessness
 
-FoodBridge runs entirely in memory — messages are pasted in, processed, and the
+AURA AI runs entirely in memory — messages are pasted in, processed, and the
 transfer plan is returned. No database is required. The structured results
 (`Message`, `Transfer`, and alert dicts) serialize cleanly to JSON, so they can
 be rendered by the web UI or returned from an API without any storage layer.
