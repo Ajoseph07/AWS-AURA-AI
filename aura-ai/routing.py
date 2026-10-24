@@ -30,9 +30,14 @@ OSRM_URL = os.environ.get("OSRM_URL", "https://router.project-osrm.org")
 
 # Detour tuning.
 MUST_AVOID_WEIGHT = 100   # one sample inside a must-avoid zone outweighs any caution exposure
-DETOUR_MARGIN = 1.35      # place detour waypoints this many radii from the zone center...
-DETOUR_PAD_KM = 1.5       # ...plus this buffer, so the road around stays outside the zone
-MAX_OSRM_CALLS = 9        # cap requests to the shared public OSRM server per route lookup
+# Detour waypoints sit this many radii from the zone center (plus a pad), tried
+# tightest first: a detour that hugs the zone edge adds the least time.
+DETOUR_MARGINS = (1.1, 1.35, 1.75)
+DETOUR_PAD_KM = 1.0
+MAX_OSRM_CALLS = 13       # cap requests to the shared public OSRM server per route lookup
+# Seconds of extra driving we'd accept to skip one caution sample (~0.4 km of road)
+# per severity point. ~10 km through a Moderate zone is worth about an 8 min detour.
+CAUTION_SECONDS = 10
 MAX_DETOUR_ROUNDS = 3     # how many separate must-avoid zones we'll detour around
 SAMPLE_STEP_KM = 0.4      # densify paths so long straight segments can't skip over a zone
 
@@ -89,17 +94,22 @@ def _danger_score(path: list[tuple[float, float]], zones: list[dict],
     destination; they can't be detoured around, so they are scored as caution.
     """
     unavoidable = unavoidable or set()
-    hits, crossed = 0.0, {}
+    blocking_hits, caution_hits, crossed = 0.0, 0.0, {}
     for pt in _densify(path):
         for z in zones:
             if point_in_circle(pt, (z["lat"], z["lon"]), z["radius_km"]):
                 blocking = must_avoid(z) and z["id"] not in unavoidable
-                hits += MUST_AVOID_WEIGHT if blocking else SEVERITY_RANK.get(z["severity"], 1)
+                if blocking:
+                    blocking_hits += MUST_AVOID_WEIGHT
+                else:
+                    caution_hits += SEVERITY_RANK.get(z["severity"], 1)
                 crossed[z["id"]] = {"id": z["id"], "event": z["event"],
                                     "severity": z["severity"], "must_avoid": blocking}
     blocking_zones = [c for c in crossed.values() if c["must_avoid"]]
     return {
-        "score": round(hits, 1),
+        "score": round(blocking_hits + caution_hits, 1),
+        "blocking_score": round(blocking_hits, 1),
+        "caution_score": round(caution_hits, 1),
         "zones_crossed": list(crossed.values()),
         "blocking": blocking_zones,     # must-avoid zones this route still enters
         "clear": not crossed,
@@ -151,8 +161,14 @@ def _to_candidate(route: dict, zones: list[dict], unavoidable: set[str],
 
 
 def _rank(c: dict) -> tuple:
-    """Safest first (fewest must-avoid hits, then least caution exposure), then fastest."""
-    return (c["danger"]["score"], c["duration_s"])
+    """Lower is better.
+
+    First: least time inside must-avoid zones (tornado / severe flood). Then the
+    fastest route, where each bit of caution-zone exposure counts as a small
+    time penalty, so we never take a long detour just to dodge wind or heat.
+    """
+    d = c["danger"]
+    return (d["blocking_score"], c["duration_s"] + d["caution_score"] * CAUTION_SECONDS)
 
 
 def _detour_arcs(origin, dest, zone: dict, zones: list[dict]) -> list[list[tuple[float, float]]]:
@@ -167,22 +183,28 @@ def _detour_arcs(origin, dest, zone: dict, zones: list[dict]) -> list[list[tuple
     """
     center = (zone["lat"], zone["lon"])
     heading = _bearing(origin, dest)
-    arcs = []
-    for margin in (DETOUR_MARGIN, DETOUR_MARGIN * 1.3):
-        dist = zone["radius_km"] * margin + DETOUR_PAD_KM
-        for side in (1, -1):
-            arc = []
-            for turn in (135, 90, 45):
-                p = _offset(center, heading + side * turn, dist)
-                if not 0.02 < _progress(origin, dest, p) < 0.98:
-                    continue
-                if any(must_avoid(z) and z["id"] != zone["id"]
+
+    def usable(p):
+        if not 0.02 < _progress(origin, dest, p) < 0.98:
+            return False
+        return not any(must_avoid(z) and z["id"] != zone["id"]
                        and point_in_circle(p, (z["lat"], z["lon"]), z["radius_km"])
-                       for z in zones):
-                    continue
-                arc.append(p)
-            if arc:
-                arcs.append(arc)
+                       for z in zones)
+
+    # Shortest options first: one point beside the zone, then a full arc that
+    # holds the route outside it. Both sides of the zone, tightest margin first.
+    shapes = ((90,), (135, 90, 45))
+    arcs, seen = [], set()
+    for tier, margin in enumerate(DETOUR_MARGINS):
+        dist = zone["radius_km"] * margin + DETOUR_PAD_KM
+        for turns in shapes:
+            for side in (1, -1):
+                arc = [p for t in turns
+                       if usable(p := _offset(center, heading + side * t, dist))]
+                key = tuple(arc)
+                if arc and key not in seen:
+                    seen.add(key)
+                    arcs.append((tier, arc))
     return arcs
 
 
@@ -213,7 +235,13 @@ def _osrm_safest_route(origin, dest, zones) -> dict:
         )
         improved = False
         base_via = list(best["via"])  # detour points kept from earlier rounds
-        for arc in _detour_arcs(origin, dest, target, zones):
+        cleared_tier = None
+        # Try every detour shape on both sides and keep the fastest safe one,
+        # rather than the first that works. Once a margin gets around the zone,
+        # skip the wider margins, since they only add distance.
+        for tier, arc in _detour_arcs(origin, dest, target, zones):
+            if cleared_tier is not None and tier > cleared_tier:
+                break
             if not budget.take():
                 break
             # Keep earlier detour points and insert these in travel order.
@@ -225,10 +253,11 @@ def _osrm_safest_route(origin, dest, zones) -> dict:
             cand = _to_candidate(routes[0], zones, unavoidable, via,
                                  detoured_around + [target["event"]])
             candidates.append(cand)
+            if cleared_tier is None and not any(b["id"] == target["id"]
+                                                for b in cand["danger"]["blocking"]):
+                cleared_tier = tier
             if _rank(cand) < _rank(best):
                 best, improved = cand, True
-                if not any(b["id"] == target["id"] for b in cand["danger"]["blocking"]):
-                    break  # this zone is cleared; move on to the next one, if any
         if improved:
             detoured_around.append(target["event"])
         if not improved or budget.left <= 0:
