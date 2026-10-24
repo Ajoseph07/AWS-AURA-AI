@@ -1,0 +1,56 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  AURA-AI DynamoDB tables (AuraAlerts, AuraRequests, AuraResources).
+  Each table uses a single String partition key, on-demand billing,
+  and the Standard table class.
+
+Resources:
+  AuraAlertsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AuraAlerts
+      BillingMode: PAY_PER_REQUEST
+      TableClass: STANDARD
+      AttributeDefinitions:
+        - AttributeName: alertId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: alertId
+          KeyType: HASH
+
+  AuraRequestsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AuraRequests
+      BillingMode: PAY_PER_REQUEST
+      TableClass: STANDARD
+      AttributeDefinitions:
+        - AttributeName: requestId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: requestId
+          KeyType: HASH
+
+  AuraResourcesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: AuraResources
+      BillingMode: PAY_PER_REQUEST
+      TableClass: STANDARD
+      AttributeDefinitions:
+        - AttributeName: resourceId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: resourceId
+          KeyType: HASH
+
+Outputs:
+  AuraAlertsTableName:
+    Description: Name of the AuraAlerts table
+    Value: !Ref AuraAlertsTable
+  AuraRequestsTableName:
+    Description: Name of the AuraRequests table
+    Value: !Ref AuraRequestsTable
+  AuraResourcesTableName:
+    Description: Name of the AuraResources table
+    Value: !Ref AuraResourcesTable
