@@ -1,7 +1,7 @@
 """Shared data models for FoodBridge.
 
 Kept as plain dataclasses so the pipeline stays dependency-light and easy to
-serialize to/from DynamoDB (AuraRequests / AuraResources / AuraAlerts).
+serialize to JSON (e.g. for the web UI or an API response).
 """
 from __future__ import annotations
 

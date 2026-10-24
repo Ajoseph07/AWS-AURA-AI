@@ -81,15 +81,11 @@ The demo prints three sections:
 Both are empty by default (open network, unlimited transport) and are
 enforced by `matcher.py` when set.
 
-## Relationship to the DynamoDB tables
+## Statelessness
 
-FoodBridge maps directly onto the project's tables:
+FoodBridge runs entirely in memory — messages are pasted in, processed, and the
+transfer plan is returned. No database is required. The structured results
+(`Message`, `Transfer`, and alert dicts) serialize cleanly to JSON, so they can
+be rendered by the web UI or returned from an API without any storage layer.
 
-| FoodBridge | Table |
-| ---------- | ----- |
-| Incoming offers / requests | `AuraRequests` |
-| Proposed transfers | `AuraResources` |
-| Urgent unmet-need alerts | `AuraAlerts` |
-
-See `../infrastructure/` to create the tables and `../app/` for the Bedrock
-client this demo reuses.
+See `../app/` for the Bedrock client this demo reuses.
