@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AURA AI — Food Bank Network Dashboard</title>
+<style>
+  /* ============ Theme tokens (light default, dark optional) ============ */
+  :root {
+    --bg: #eef0f8; --surface: #ffffff; --surface-2: #f5f6fc; --sidebar: #e3e6f3;
+    --line: #d7dbea; --text: #1d2440; --muted: #6b7393; --heading: #2b3a8c;
+    --accent: #7c6ff0; --accent-2: #5ac8e0; --accent-soft: #e7e4fd;
+    --ok: #2fb67c; --warn: #f2b630; --bad: #e5484d; --pending: #a99ff7;
+    --band-1: #f6d4d6; --band-2: #fbecc6; --band-3: #d3f0e1;
+    --heat-none: #f1f2f8; --shadow: 0 1px 2px rgba(30,40,90,.06), 0 4px 14px rgba(30,40,90,.05);
+    --scroll-track: #e3e6f3; --scroll-thumb: #b9b2f5;
+  }
+  [data-theme="dark"] {
+    --bg: #0d0f17; --surface: #171a26; --surface-2: #1f2333; --sidebar: #11131c;
+    --line: #2a2f43; --text: #e7e9f4; --muted: #8e95b3; --heading: #c9c3ff;
+    --accent: #8f83ff; --accent-2: #5ad6ee; --accent-soft: #2a2650;
+    --band-1: #3d2328; --band-2: #3d3420; --band-3: #1d3a2e;
+    --heat-none: #1c2030; --shadow: 0 1px 2px rgba(0,0,0,.4);
+    --scroll-track: #11131c; --scroll-thumb: #4a4385;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.45;
+  }
+  /* Themed scrollbars (backlog: white scrollbar didn't match background) */
+  * { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) var(--scroll-track); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--scroll-track); }
+  ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 8px; border: 2px solid var(--scroll-track); }
+
+  /* ============ Shell ============ */
+  .app { display: grid; grid-template-columns: 236px 1fr; height: 100vh; }
+  .sidebar { background: var(--sidebar); border-right: 1px solid var(--line); padding: 16px 0; overflow-y: auto; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 0 18px 18px; font-weight: 800; color: var(--heading); font-size: 17px; }
+  .brand .logo { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); display: grid; place-items: center; color: #fff; font-size: 14px; }
+  .nav-title { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: 8px 18px; }
+  .nav a { display: block; padding: 9px 18px; color: var(--text); text-decoration: none; font-size: 13px; border-left: 3px solid transparent; }
+  .nav a:hover { background: var(--accent-soft); }
+  .nav a.active { background: var(--surface); border-left-color: var(--accent); font-weight: 700; color: var(--heading); }
+  .side-foot { margin: 18px; padding: 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .side-foot b { color: var(--text); }
+
+  main { overflow-y: auto; }
+  .topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 14px 26px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .topbar h1 { margin: 0; font-size: 20px; color: var(--heading); }
+  .pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); letter-spacing: .03em; }
+  .pill.warn { background: #fdf0d2; color: #9a6b00; }
+  [data-theme="dark"] .pill.warn { background: #3d3420; color: #f2c25b; }
+  .spacer { flex: 1; }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: 7px 13px; font-weight: 600; font-size: 13px; }
+  button.primary { background: var(--heading); border-color: var(--heading); color: #fff; }
+  [data-theme="dark"] button.primary { background: var(--accent); border-color: var(--accent); color: #0d0f17; }
+  button:hover { filter: brightness(.97); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 5px 11px; font-size: 12px; background: transparent; color: var(--muted); }
+  .seg button.on { background: var(--accent); color: #fff; }
+
+  .content { padding: 20px 26px 40px; display: grid; gap: 22px; }
+  .section-title { font-size: 13px; font-weight: 800; color: var(--heading); margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
+  .section-title .hint { font-weight: 500; color: var(--muted); font-size: 12px; }
+
+  /* ============ KPI cards ============ */
+  .kpis { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 14px; }
+  @media (max-width: 1350px) { .kpis { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+  .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); text-align: center; position: relative; overflow: hidden; }
+  .kpi::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+  .kpi .label { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kpi .value { font-size: 30px; font-weight: 800; color: var(--heading); margin: 6px 0 4px; letter-spacing: -.5px; }
+  .kpi .meta { display: flex; justify-content: center; gap: 0; font-size: 11px; color: var(--muted); }
+  .kpi .meta > div { padding: 0 10px; white-space: nowrap; }
+  .kpi .meta > div + div { border-left: 1px dashed var(--line); }
+  .kpi .meta b { display: block; color: var(--text); font-size: 12px; }
+  .up { color: var(--ok) !important; } .down { color: var(--bad) !important; }
+  .kpi svg.spark { display: block; margin: 6px auto 0; }
+
+  /* ============ Cards / grid ============ */
+  .grid { display: grid; gap: 16px; }
+  .g-2 { grid-template-columns: minmax(0,1.15fr) minmax(0,1fr); }
+  .g-3 { grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr); }
+  @media (max-width: 1200px) { .g-2, .g-3 { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; box-shadow: var(--shadow); min-width: 0; }
+  .card h3 { margin: 0; font-size: 14px; text-align: center; }
+  .card .sub { text-align: center; font-size: 11px; color: var(--muted); margin: 3px 0 10px; }
+  .card .head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .card .head h3 { text-align: left; flex: 1; }
+  .legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; font-size: 11px; color: var(--muted); margin: 4px 0 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  svg text { fill: var(--muted); font-size: 11px; font-family: inherit; }
+  svg .lbl-strong { fill: var(--text); font-weight: 600; }
+  svg .axis { stroke: var(--line); }
+  .scroll-y { max-height: 420px; overflow-y: auto; padding-right: 4px; }
+
+  /* Tooltip */
+  #tip { position: fixed; pointer-events: none; z-index: 50; background: var(--text); color: var(--surface); font-size: 12px; padding: 7px 10px; border-radius: 7px; max-width: 280px; opacity: 0; transition: opacity .1s; box-shadow: 0 6px 18px rgba(0,0,0,.2); }
+  #tip b { display: block; margin-bottom: 2px; }
+
+  /* Heatmap */
+  .heat { display: grid; gap: 3px; font-size: 11px; }
+  .heat .hc { height: 30px; border-radius: 5px; display: grid; place-items: center; font-weight: 700; font-size: 10.5px; color: #1d2440; }
+  .heat .rh { display: flex; align-items: center; color: var(--text); font-weight: 600; padding-right: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .heat .chd { color: var(--muted); text-align: center; font-weight: 600; font-size: 10.5px; padding-bottom: 2px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; color: var(--muted); font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 8px 8px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--surface); }
+  td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  tr:last-child td { border-bottom: 0; }
+  .tag { font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: .03em; }
+  .tag.critical { background: #fde2e3; color: #b42328; } .tag.high { background: #fdecd6; color: #a35a00; }
+  .tag.medium { background: #fff6cc; color: #806300; } .tag.low { background: #dff5ea; color: #1c7a4f; }
+  .tag.approved { background: #dff5ea; color: #1c7a4f; } .tag.proposed { background: var(--accent-soft); color: var(--accent); }
+  [data-theme="dark"] .tag.critical { background: #4a1d22; color: #ff9aa0; } [data-theme="dark"] .tag.high { background: #4a3218; color: #ffc27a; }
+  [data-theme="dark"] .tag.medium { background: #3f3818; color: #ffe27a; } [data-theme="dark"] .tag.low, [data-theme="dark"] .tag.approved { background: #183a2b; color: #7fe0b2; }
+  .fill { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; display: flex; min-width: 90px; }
+  .fill span { display: block; height: 100%; }
+  .muted { color: var(--muted); }
+  .num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+
+  /* Alert banner */
+  .banner { display: flex; gap: 14px; align-items: center; background: linear-gradient(90deg, var(--accent-soft), transparent); border: 1px solid var(--line); border-left: 4px solid var(--warn); border-radius: 12px; padding: 12px 16px; }
+  .banner .icon { font-size: 22px; }
+  .banner b { color: var(--heading); }
+
+  /* Drawer (separate Requests + Surplus inputs) */
+  .drawer-bg { position: fixed; inset: 0; background: rgba(15,20,40,.35); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 20; }
+  .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(720px, 96vw); background: var(--surface); border-left: 1px solid var(--line); transform: translateX(100%); transition: transform .25s; z-index: 21; display: flex; flex-direction: column; }
+  body.open .drawer { transform: none; } body.open .drawer-bg { opacity: 1; pointer-events: auto; }
+  .drawer header { padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+  .drawer header h2 { margin: 0; font-size: 17px; color: var(--heading); flex: 1; }
+  .drawer .body { padding: 16px 20px; overflow-y: auto; display: grid; gap: 14px; }
+  .inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 700px) { .inputs { grid-template-columns: 1fr; } }
+  .field label { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 800; color: var(--heading); margin-bottom: 6px; }
+  .field label .count { margin-left: auto; font-weight: 600; color: var(--muted); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; }
+  textarea { width: 100%; height: 300px; resize: vertical; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); padding: 10px 12px; font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  textarea:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  .disrupt { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--surface-2); font-size: 12.5px; }
+  .disrupt .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .disrupt input[type=text] { flex: 1; min-width: 160px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--text); padding: 6px 9px; font: inherit; }
+  .drawer footer { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; gap: 10px; }
+  .help { font-size: 12px; color: var(--muted); }
+  .help code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+  .skipped { font-size: 12px; color: var(--bad); }
+
+  .empty { text-align: center; color: var(--muted); padding: 28px; font-size: 13px; }
+  .footer-note { font-size: 11px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="logo">A</span> AURA AI</div>
+    <div class="nav-title">Dashboards</div>
+    <nav class="nav" id="nav">
+      <a href="#overview" class="active">Network Overview</a>
+      <a href="#coverage">Demand Coverage</a>
+      <a href="#heatmap">Demand Heat Map</a>
+      <a href="#disruption">Disruption Recovery</a>
+      <a href="#priority">Priority Requests</a>
+      <a href="#plan">Transfer Plan</a>
+    </nav>
+    <div class="nav-title">Data</div>
+    <nav class="nav">
+      <a href="#" id="openData">Requests &amp; Surplus</a>
+      <a href="/">Classic view</a>
+    </nav>
+    <div class="side-foot">
+      <b>Santa Clara &amp; San Mateo network</b><br/>
+      <span id="sideCounts">—</span><br/>
+      All quantities in <b>cases</b>.
+    </div>
+  </aside>
+
+  <main>
+    <div class="topbar">
+      <h1>Food Bank Network Dashboard</h1>
+      <span class="pill warn">SIMULATED DATA</span>
+      <span class="pill" id="modePill">rules</span>
+      <div class="spacer"></div>
+      <div class="seg" id="phaseSeg" title="Compare before vs. after the disruption">
+        <button data-phase="after" class="on">After disruption</button>
+        <button data-phase="before">Before</button>
+      </div>
+      <button id="themeBtn" title="Toggle light/dark">Dark mode</button>
+      <button class="primary" id="editBtn">Edit requests &amp; surplus</button>
+    </div>
+
+    <div class="content">
+      <div class="banner" id="banner" hidden></div>
+
+      <section id="overview">
+        <div class="section-title">Network Overview <span class="hint" id="asOf"></span></div>
+        <div class="kpis" id="kpis"></div>
+      </section>
+
+      <section class="grid g-2" id="coverage">
+        <div class="card">
+          <div class="head"><h3>Demand Coverage by Food Bank</h3>
+            <div class="seg" id="bulletSeg"><button data-n="12" class="on">Worst 12</button><button data-n="999">All</button></div>
+          </div>
+          <div class="sub">Bullet graph · bar = approved coverage · diamond = projected if pending matches are approved · line = 90% target</div>
+          <div class="legend">
+            <span><i style="background:var(--band-1)"></i>Critical 0–50%</span>
+            <span><i style="background:var(--band-2)"></i>At risk 50–80%</span>
+            <span><i style="background:var(--band-3)"></i>On track 80–100%</span>
+          </div>
+          <div class="scroll-y" id="bullet"></div>
+        </div>
+        <div class="grid" style="gap:16px">
+          <div class="card">
+            <h3>Requested vs. Matched by Category</h3>
+            <div class="sub">Stacked bar · total height = cases requested</div>
+            <div class="legend">
+              <span><i style="background:var(--ok)"></i>Approved</span>
+              <span><i style="background:var(--pending)"></i>Proposed (substitution)</span>
+              <span><i style="background:var(--bad)"></i>Unmet</span>
+            </div>
+            <div id="stacked"></div>
+          </div>
+          <div class="card">
+            <h3>Surplus Put to Use</h3>
+            <div class="sub">Resource utilization = approved cases drawn ÷ starting supply, per category</div>
+            <div id="util"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="heatmap">
+        <div class="head"><h3>Demand Heat Map — Food Bank Locations × Category</h3>
+          <div class="seg" id="heatSeg"><button data-mode="unmet" class="on">Unmet demand</button><button data-mode="demand">Total demand</button></div>
+        </div>
+        <div class="sub" id="heatSub"></div>
+        <div class="legend">
+          <span><i style="background:#3fc58a"></i>Low demand</span>
+          <span><i style="background:#f6c945"></i>Medium demand</span>
+          <span><i style="background:#ef5a5f"></i>High demand</span>
+          <span><i style="background:var(--heat-none);border:1px solid var(--line)"></i>None</span>
+        </div>
+        <div id="heat"></div>
+      </section>
+
+      <section class="grid g-2" id="disruption">
+        <div class="card">
+          <div class="head"><h3>Supply Waterfall</h3>
+            <select id="wfCat" style="border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--text);padding:5px 8px;font:inherit;font-size:12px"></select>
+          </div>
+          <div class="sub">Starting supply, withdrawn, road closures, expired, new offers, allocated, ending supply (cases)</div>
+          <div id="waterfall"></div>
+        </div>
+        <div class="card">
+          <h3>Coverage Recovery After Disruption</h3>
+          <div class="sub">Percentage points of demand coverage · AURA AI rematching</div>
+          <div id="covWaterfall"></div>
+        </div>
+      </section>
+
+      <section class="grid g-2" id="priority">
+        <div class="card">
+          <h3>Priority Item Requests</h3>
+          <div class="sub">Ordered by urgency, then priority score = urgency weight × unmet cases (critical 3 · high 2 · medium 1 · low 0.5)</div>
+          <div class="scroll-y"><table id="queue"></table></div>
+        </div>
+        <div class="card">
+          <h3>Requests by Urgency</h3>
+          <div class="sub">Share of requested cases</div>
+          <div id="donut"></div>
+        </div>
+      </section>
+
+      <section class="card" id="plan">
+        <div class="head"><h3>Proposed Transfer Plan</h3>
+          <div class="seg" id="planSeg"><button data-f="all" class="on">All</button><button data-f="approved">Approved</button><button data-f="proposed">Needs review</button></div>
+        </div>
+        <div class="sub">Exact item matches are approved automatically; same-category substitutions are proposed for coordinator review</div>
+        <div class="scroll-y"><table id="planTable"></table></div>
+      </section>
+
+      <div class="footer-note">AURA AI · simulated demo data · all metrics calculated server-side · units: cases</div>
+    </div>
+  </main>
+</div>
+
+<!-- Requests & Surplus drawer -->
+<div class="drawer-bg" id="drawerBg"></div>
+<aside class="drawer" aria-label="Requests and surplus">
+  <header>
+    <h2>Requests &amp; Surplus Reports</h2>
+    <button id="loadDemo">Load demo data</button>
+    <button id="closeDrawer">Close</button>
+  </header>
+  <div class="body">
+    <div class="help">One message per line: <code>Food bank name | message</code>. Use catalog items (e.g. rice, canned tuna, shelf-stable meal kits) and quantities in <b>cases</b>. Words like <i>ran out</i>, <i>urgent</i>, or <i>no rush</i> set urgency; <i>expires in 3 days</i> sets expiry.</div>
+    <div class="inputs">
+      <div class="field">
+        <label><span class="dot" style="background:var(--bad)"></span>Item Requests <span class="count" id="reqCount">0</span></label>
+        <textarea id="reqText" placeholder="Sacred Heart Community Service | Ran out of shelf-stable meal kits, need 60 cases today"></textarea>
+      </div>
+      <div class="field">
+        <label><span class="dot" style="background:var(--ok)"></span>Surplus Reports <span class="count" id="offCount">0</span></label>
+        <textarea id="offText" placeholder="Second Harvest of Silicon Valley | Surplus of 80 cases of shelf-stable meal kits"></textarea>
+      </div>
+    </div>
+    <div class="disrupt">
+      <label style="display:flex;gap:8px;align-items:center;font-weight:800;color:var(--heading)">
+        <input type="checkbox" id="dOn" checked /> Simulate a disruption
+      </label>
+      <div class="row"><span class="muted" style="width:120px">Road closures</span><input type="text" id="dCities" placeholder="Campbell, Gilroy" /></div>
+      <div class="row"><span class="muted" style="width:120px">Withdrawn offers</span><input type="text" id="dOrgs" placeholder="Corner Pantry" /></div>
+      <div class="row"><span class="muted" style="width:120px">Days elapsed</span><input type="text" id="dDays" placeholder="3" style="max-width:80px;flex:0" /></div>
+      <div class="row" style="align-items:flex-start"><span class="muted" style="width:120px">New offers</span>
+        <textarea id="dNew" style="height:70px" placeholder="Second Harvest of Silicon Valley | Emergency delivery: 50 cases of pinto beans"></textarea></div>
+    </div>
+    <div class="skipped" id="skipped"></div>
+  </div>
+  <footer>
+    <button class="primary" id="runBtn">Analyze network</button>
+    <button id="clearBtn">Clear</button>
+  </footer>
+</aside>
+
+<div id="tip"></div>
+
+<script>
+/* ===================== helpers ===================== */
+const $ = (s) => document.querySelector(s);
+const NS = 'http://www.w3.org/2000/svg';
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (n) => Math.round(n).toLocaleString();
+const pct = (x, d = 1) => x == null ? '—' : (x * 100).toFixed(d) + '%';
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function el(tag, attrs = {}, parent) {
+  const n = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+function svg(w, h) { return el('svg', { viewBox: `0 0 ${w} ${h}`, width: '100%', role: 'img' }); }
+function text(parent, x, y, str, attrs = {}) { const t = el('text', { x, y, ...attrs }, parent); t.textContent = str; return t; }
+const tip = $('#tip');
+function hover(node, html) {
+  node.addEventListener('mousemove', (e) => { tip.innerHTML = html; tip.style.opacity = 1; tip.style.left = (e.clientX + 14) + 'px'; tip.style.top = (e.clientY + 14) + 'px'; });
+  node.addEventListener('mouseleave', () => (tip.style.opacity = 0));
+}
+function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); return Math.ceil(v / p) * p; }
+
+/* ===================== state ===================== */
+let DATA = null, BEFORE = null, phase = 'after', bulletN = 12, heatMode = 'unmet', planFilter = 'all';
+const cur = () => (phase === 'before' && BEFORE ? BEFORE : DATA);
+
+/* ===================== KPI cards ===================== */
+function renderKPIs() {
+  const k = cur().kpis, kb = BEFORE ? BEFORE.kpis : null;
+  const delta = (a, b, isPct = true, invert = false) => {
+    if (a == null || b == null) return '';
+    const d = a - b; if (Math.abs(d) < 1e-9) return '<span>±0</span>';
+    const good = invert ? d < 0 : d > 0;
+    return `<span class="${good ? 'up' : 'down'}">${d > 0 ? '+' : ''}${isPct ? (d * 100).toFixed(1) + 'pt' : fmt(d)}</span>`;
+  };
+  const showDelta = phase === 'after' && kb;
+  const cards = [
+    { label: 'Demand Coverage', value: pct(k.coverage), a: showDelta ? delta(k.coverage, kb.coverage) : '', b: pct(k.projected), bl: 'If approved', spark: k.coverage },
+    { label: 'Cases Requested', value: fmt(k.requested), a: `${k.orgs_requesting}`, al: 'Food banks', b: fmt(k.unmet), bl: 'Unmet' },
+    { label: 'Cases Matched', value: fmt(k.approved), a: showDelta ? delta(k.approved, kb.approved, false) : '', b: fmt(k.proposed), bl: 'Pending review' },
+    { label: 'Surplus Utilization', value: pct(k.supply_utilization), a: `${k.orgs_offering}`, al: 'Donor orgs', b: '', spark: k.supply_utilization },
+    { label: 'Critical Requests Open', value: k.critical_open, a: showDelta ? delta(k.critical_open, kb.critical_open, false, true) : '', b: '', },
+    { label: 'Pre-Disruption Coverage', value: pct(k.coverage_before_disruption), a: '', b: phase === 'after' && DATA.disruption ? DATA.disruption.invalidated_matches : '', bl: 'Matches broken' },
+  ];
+  $('#kpis').innerHTML = cards.map((c) => `
+    <div class="kpi">
+      <div class="label">${c.label}</div>
+      <div class="value">${c.value}</div>
+      <div class="meta">
+        ${c.a !== '' ? `<div><b>${c.a}</b>${c.al || 'vs. before'}</div>` : ''}
+        ${c.b !== '' ? `<div><b>${c.b}</b>${c.bl || ''}</div>` : ''}
+      </div>
+      ${c.spark != null ? gaugeBar(c.spark) : ''}
+    </div>`).join('');
+}
+function gaugeBar(v) {
+  const w = 140, x = Math.max(0, Math.min(1, v)) * w;
+  return `<svg class="spark" width="${w}" height="8" viewBox="0 0 ${w} 8"><rect width="${w}" height="8" rx="4" fill="${css('--surface-2')}"/><rect width="${x}" height="8" rx="4" fill="${css('--accent')}"/><line x1="${0.9 * w}" x2="${0.9 * w}" y1="0" y2="8" stroke="${css('--text')}" stroke-width="1.5"/></svg>`;
+}
+
+/* ===================== Bullet graph ===================== */
+function renderBullet() {
+  const rows = cur().bullet.slice(0, bulletN), target = cur().target;
+  const W = 660, rowH = 30, L = 210, R = 58, H = rows.length * rowH + 26, bw = W - L - R;
+  const s = svg(W, H), X = (v) => L + v * bw;
+  [0, .25, .5, .75, 1].forEach((t) => { el('line', { x1: X(t), x2: X(t), y1: 0, y2: H - 20, class: 'axis', 'stroke-dasharray': '2 3' }, s); text(s, X(t), H - 6, (t * 100) + '%', { 'text-anchor': 'middle' }); });
+  rows.forEach((r, i) => {
+    const y = i * rowH + 4, g = el('g', {}, s);
+    const name = r.org.length > 30 ? r.org.slice(0, 29) + '…' : r.org;
+    text(g, L - 8, y + 12, name, { 'text-anchor': 'end', class: 'lbl-strong' });
+    text(g, L - 8, y + 24, r.city, { 'text-anchor': 'end', 'font-size': 9.5 });
+    cur().bands.forEach((b, j) => el('rect', { x: X(b.from), y, width: X(b.to) - X(b.from), height: 22, fill: css(`--band-${j + 1}`), rx: j === 0 ? 3 : 0 }, g));
+    if (r.coverage == null) { text(g, X(0) + 8, y + 15, 'No demand'); return; }
+    const color = r.coverage < .5 ? css('--bad') : r.coverage < .8 ? css('--warn') : css('--ok');
+    el('rect', { x: X(0), y: y + 7, width: Math.max(1.5, r.coverage * bw), height: 8, fill: color, rx: 2 }, g);
+    const px = X(Math.min(1, r.projected));
+    el('path', { d: `M${px},${y + 4} l5,7 l-5,7 l-5,-7z`, fill: css('--accent'), stroke: css('--surface'), 'stroke-width': 1 }, g);
+    el('line', { x1: X(target), x2: X(target), y1: y + 1, y2: y + 21, stroke: css('--text'), 'stroke-width': 2 }, g);
+    text(g, W - 4, y + 15, pct(r.coverage, 0), { class: 'lbl-strong', 'text-anchor': 'end' });
+    hover(g, `<b>${esc(r.org)}</b>${esc(r.city)} · ${fmt(r.requested)} cases requested<br/>Approved coverage: ${pct(r.coverage)}<br/>Projected: ${pct(r.projected)} · ${r.status}`);
+  });
+  $('#bullet').replaceChildren(s);
+}
+
+/* ===================== Stacked bar ===================== */
+function renderStacked() {
+  const rows = cur().stacked, W = 560, H = 250, L = 40, B = 62, T = 16, cw = (W - L - 8) / rows.length;
+  const max = niceMax(Math.max(...rows.map((r) => r.requested), 1)), Y = (v) => H - B - (v / max) * (H - B - T);
+  const s = svg(W, H);
+  for (let i = 0; i <= 4; i++) { const v = (max / 4) * i; el('line', { x1: L, x2: W, y1: Y(v), y2: Y(v), class: 'axis' }, s); text(s, L - 6, Y(v) + 4, fmt(v), { 'text-anchor': 'end' }); }
+  rows.forEach((r, i) => {
+    const x = L + i * cw + cw * 0.18, w = cw * 0.64, g = el('g', {}, s);
+    let base = 0;
+    [['approved', '--ok'], ['proposed', '--pending'], ['unmet', '--bad']].forEach(([k, c]) => {
+      if (r[k] <= 0) return;
+      el('rect', { x, y: Y(base + r[k]), width: w, height: Y(base) - Y(base + r[k]), fill: css(c) }, g); base += r[k];
+    });
+    text(g, x + w / 2, Y(r.requested) - 4, fmt(r.requested), { 'text-anchor': 'middle', class: 'lbl-strong', 'font-size': 10 });
+    text(g, x + w / 2, H - B + 14, r.short, { 'text-anchor': 'end', transform: `rotate(-35 ${x + w / 2} ${H - B + 14})`, 'font-size': 10 });
+    hover(g, `<b>${esc(r.category)}</b>Requested: ${fmt(r.requested)} cases<br/>Approved: ${fmt(r.approved)} · Proposed: ${fmt(r.proposed)}<br/>Unmet: ${fmt(r.unmet)}`);
+  });
+  $('#stacked').replaceChildren(s);
+}
+
+/* ===================== Utilization bars ===================== */
+function renderUtil() {
+  const rows = cur().utilization, W = 560, rowH = 22, L = 86, H = rows.length * rowH + 6, bw = W - L - 120;
+  const s = svg(W, H);
+  rows.forEach((r, i) => {
+    const y = i * rowH + 3, g = el('g', {}, s);
+    text(g, L - 8, y + 12, r.short, { 'text-anchor': 'end', class: 'lbl-strong' });
+    el('rect', { x: L, y: y + 3, width: bw, height: 11, rx: 5, fill: css('--surface-2') }, g);
+    el('rect', { x: L, y: y + 3, width: Math.max(2, Math.min(1, r.utilization) * bw), height: 11, rx: 5, fill: css('--accent') }, g);
+    text(g, L + bw + 8, y + 12, `${pct(r.utilization, 0)}  ·  ${fmt(r.used)}/${fmt(r.supply)}`);
+    hover(g, `<b>${esc(r.category)}</b>${fmt(r.used)} of ${fmt(r.supply)} cases of surplus allocated (${pct(r.utilization)})`);
+  });
+  $('#util').replaceChildren(s);
+}
+
+/* ===================== Heatmap ===================== */
+const HEAT = { none: null, low: '#3fc58a', medium: '#f6c945', high: '#ef5a5f' };
+function renderHeat() {
+  const h = cur().heatmap, m = h[heatMode];
+  $('#heatSub').textContent = heatMode === 'unmet'
+    ? `Heat = Σ (requested − matched) × urgency weight · color scaled to the worst cell (${fmt(m.peak)}) · rows = food bank cities`
+    : `Heat = Σ requested × urgency weight · color scaled to the worst cell (${fmt(m.peak)}) · rows = food bank cities`;
+  if (!h.rows.length) { $('#heat').innerHTML = '<div class="empty">No requests yet.</div>'; return; }
+  const cols = h.columns.length, wrap = document.createElement('div');
+  wrap.className = 'heat'; wrap.style.gridTemplateColumns = `150px repeat(${cols}, minmax(52px, 1fr))`;
+  wrap.innerHTML = '<div></div>' + h.columns.map((c) => `<div class="chd" title="${esc(c.category)}">${esc(c.short)}</div>`).join('');
+  m.grid.forEach((row) => {
+    const rh = document.createElement('div'); rh.className = 'rh'; rh.textContent = row.row; wrap.appendChild(rh);
+    row.cells.forEach((c, j) => {
+      const d = document.createElement('div'); d.className = 'hc';
+      const base = HEAT[c.level];
+      d.style.background = base ? base : css('--heat-none');
+      if (base) d.style.opacity = (0.55 + 0.45 * c.intensity).toFixed(2);
+      d.textContent = c.heat ? fmt(c.heat) : '';
+      hover(d, `<b>${esc(row.row)} · ${esc(h.columns[j].category)}</b>${heatMode === 'unmet' ? 'Urgency-weighted unmet' : 'Urgency-weighted demand'}: ${fmt(c.heat)}<br/>Level: ${c.level} (${pct(c.intensity, 0)} of peak)`);
+      wrap.appendChild(d);
+    });
+  });
+  $('#heat').replaceChildren(wrap);
+}
+
+/* ===================== Waterfall ===================== */
+function waterfallSVG(steps, unit, extra) {
+  const W = 560, H = 270, L = 44, B = 52, T = 22, n = steps.length, cw = (W - L - 6) / n;
+  let run = 0; const bars = steps.map((s) => {
+    if (s.kind === 'total') { run = s.value; return { ...s, lo: 0, hi: s.value }; }
+    const a = run, b = run + s.value; run = b; return { ...s, lo: Math.min(a, b), hi: Math.max(a, b) };
+  });
+  const top = Math.max(...bars.map((b) => b.hi), extra || 0, 1), max = unit === '% pts' ? 100 : niceMax(top);
+  const Y = (v) => H - B - (v / max) * (H - B - T), s = svg(W, H);
+  for (let i = 0; i <= 4; i++) { const v = (max / 4) * i; el('line', { x1: L, x2: W, y1: Y(v), y2: Y(v), class: 'axis' }, s); text(s, L - 6, Y(v) + 4, unit === '% pts' ? Math.round(v) + '%' : fmt(v), { 'text-anchor': 'end' }); }
+  bars.forEach((b, i) => {
+    const x = L + i * cw + cw * 0.16, w = cw * 0.68, g = el('g', {}, s);
+    const fill = b.kind === 'total' ? css('--accent') : b.value >= 0 ? css('--ok') : css('--bad');
+    el('rect', { x, y: Y(b.hi), width: w, height: Math.max(1, Y(b.lo) - Y(b.hi)), fill, rx: 3 }, g);
+    if (i < bars.length - 1) { const nxt = b.kind === 'total' ? b.value : (b.value >= 0 ? b.hi : b.lo); el('line', { x1: x + w, x2: x + cw, y1: Y(nxt), y2: Y(nxt), stroke: css('--muted'), 'stroke-dasharray': '3 3' }, g); }
+    const v = unit === '% pts' ? (b.kind === 'total' ? b.value.toFixed(1) + '%' : (b.value > 0 ? '+' : '') + b.value.toFixed(1)) : (b.kind === 'total' ? fmt(b.value) : (b.value > 0 ? '+' : '') + fmt(b.value));
+    text(g, x + w / 2, Y(b.hi) - 6, v, { 'text-anchor': 'middle', class: 'lbl-strong', 'font-size': 11 });
+    const words = b.label.split(' '), mid = Math.ceil(words.length / 2);
+    text(g, x + w / 2, H - B + 16, words.slice(0, mid).join(' '), { 'text-anchor': 'middle', 'font-size': 10 });
+    text(g, x + w / 2, H - B + 29, words.slice(mid).join(' '), { 'text-anchor': 'middle', 'font-size': 10 });
+    hover(g, `<b>${esc(b.label)}</b>${v} ${unit === '% pts' ? '' : unit}`);
+  });
+  if (extra != null) {
+    const y = Y(extra); el('line', { x1: L, x2: W, y1: y, y2: y, stroke: css('--accent'), 'stroke-dasharray': '6 4', 'stroke-width': 1.5 }, s);
+    text(s, W - 4, y - 5, `${extra.toFixed(1)}% if pending substitutions approved`, { 'text-anchor': 'end', fill: css('--accent'), 'font-weight': 700 });
+  }
+  return s;
+}
+function renderWaterfalls() {
+  const d = cur(), sel = $('#wfCat'), chosen = sel.value || '__all';
+  sel.innerHTML = `<option value="__all">All categories</option>` + Object.keys(d.waterfall_by_category).map((c) => `<option ${c === chosen ? 'selected' : ''}>${esc(c)}</option>`).join('');
+  if (![...sel.options].some((o) => o.value === chosen)) sel.value = '__all'; else sel.value = chosen;
+  const wf = sel.value === '__all' ? d.waterfall : d.waterfall_by_category[sel.value];
+  $('#waterfall').replaceChildren(waterfallSVG(wf.steps, wf.unit));
+  const dis = DATA.disruption;
+  if (!dis) { $('#covWaterfall').innerHTML = '<div class="empty">Enable “Simulate a disruption” to see how AURA AI recovers coverage.</div>'; return; }
+  const cw = dis.coverage_waterfall;
+  $('#covWaterfall').replaceChildren(waterfallSVG(cw.steps, cw.unit, cw.projected));
+}
+
+/* ===================== Priority queue + donut ===================== */
+function renderQueue() {
+  const rows = cur().priority_queue;
+  $('#queue').innerHTML = `<thead><tr><th>Urgency</th><th>Food bank</th><th>Item</th><th class="num">Cases</th><th>Fulfilment</th><th class="num">Priority</th></tr></thead><tbody>` +
+    rows.map((r) => {
+      const a = r.approved / r.quantity * 100, p = r.proposed / r.quantity * 100;
+      return `<tr><td><span class="tag ${r.urgency}">${r.urgency}</span></td>
+        <td><b>${esc(r.org)}</b><div class="muted" style="font-size:11px">${esc(r.city)}</div></td>
+        <td>${esc(r.item)}<div class="muted" style="font-size:11px">${esc(r.category)}</div></td>
+        <td class="num">${fmt(r.quantity)}</td>
+        <td><div class="fill" title="${fmt(r.approved)} approved · ${fmt(r.proposed)} proposed · ${fmt(r.unmet)} unmet"><span style="width:${a}%;background:var(--ok)"></span><span style="width:${p}%;background:var(--pending)"></span></div>
+          <div class="muted" style="font-size:10.5px;margin-top:3px">${r.unmet > 0 ? fmt(r.unmet) + ' unmet' : r.proposed > 0 ? 'covered, pending review' : 'fully covered'}</div></td>
+        <td class="num"><b>${r.priority}</b></td></tr>`;
+    }).join('') + '</tbody>';
+}
+function renderDonut() {
+  const order = ['critical', 'high', 'medium', 'low'], colors = { critical: '#e5484d', high: '#f59f3a', medium: '#f6c945', low: '#3fc58a' };
+  const tot = {}; cur().priority_queue.forEach((r) => (tot[r.urgency] = (tot[r.urgency] || 0) + r.quantity));
+  const sum = Object.values(tot).reduce((a, b) => a + b, 0) || 1;
+  const W = 380, H = 240, cx = 120, cy = 120, R = 92, r = 56, s = svg(W, H);
+  let ang = -Math.PI / 2;
+  order.forEach((u) => {
+    const v = tot[u] || 0; if (!v) return;
+    const a2 = ang + (v / sum) * Math.PI * 2, large = a2 - ang > Math.PI ? 1 : 0;
+    const p = (rad, a) => `${cx + rad * Math.cos(a)},${cy + rad * Math.sin(a)}`;
+    const path = el('path', { d: `M${p(R, ang)} A${R},${R} 0 ${large} 1 ${p(R, a2)} L${p(r, a2)} A${r},${r} 0 ${large} 0 ${p(r, ang)}Z`, fill: colors[u], stroke: css('--surface'), 'stroke-width': 2 }, s);
+    hover(path, `<b>${u}</b>${fmt(v)} cases (${pct(v / sum)})`);
+    ang = a2;
+  });
+  text(s, cx, cy - 2, fmt(sum), { 'text-anchor': 'middle', class: 'lbl-strong', 'font-size': 22 });
+  text(s, cx, cy + 16, 'cases requested', { 'text-anchor': 'middle' });
+  order.forEach((u, i) => {
+    const y = 66 + i * 30; el('rect', { x: 250, y: y - 10, width: 12, height: 12, rx: 3, fill: colors[u] }, s);
+    text(s, 270, y, u[0].toUpperCase() + u.slice(1), { class: 'lbl-strong' });
+    text(s, 270, y + 14, `${fmt(tot[u] || 0)} cases · ${pct((tot[u] || 0) / sum, 0)}`, { 'font-size': 10.5 });
+  });
+  $('#donut').replaceChildren(s);
+}
+
+/* ===================== Transfer plan ===================== */
+function renderPlan() {
+  const rows = cur().plan.filter((m) => planFilter === 'all' || m.status === planFilter);
+  if (!rows.length) { $('#planTable').innerHTML = '<tr><td class="empty">No transfers in this view.</td></tr>'; return; }
+  $('#planTable').innerHTML = `<thead><tr><th>Status</th><th>From (surplus)</th><th></th><th>To (request)</th><th>Item</th><th class="num">Cases</th><th>Urgency</th></tr></thead><tbody>` +
+    rows.map((m) => `<tr><td><span class="tag ${m.status}">${m.status === 'proposed' ? 'review' : 'approved'}</span></td>
+      <td><b>${esc(m.from_org)}</b><div class="muted" style="font-size:11px">${esc(m.from_city)}</div></td>
+      <td><svg width="18" height="10" viewBox="0 0 18 10"><path d="M0 5h14M10 1l4 4-4 4" stroke="var(--accent)" stroke-width="2" fill="none"/></svg></td>
+      <td><b>${esc(m.to_org)}</b><div class="muted" style="font-size:11px">${esc(m.to_city)}</div></td>
+      <td>${esc(m.item)}${m.substitution ? `<div class="muted" style="font-size:11px">substitutes for ${esc(m.requested_item)}</div>` : ''}</td>
+      <td class="num">${fmt(m.quantity)}</td>
+      <td><span class="tag ${m.urgency}">${m.urgency}</span></td></tr>`).join('') + '</tbody>';
+}
+
+/* ===================== Orchestration ===================== */
+function renderAll() {
+  if (!DATA) return;
+  const d = cur();
+  $('#modePill').textContent = DATA.extraction === 'bedrock' ? 'BEDROCK EXTRACTION' : 'RULE EXTRACTION';
+  $('#asOf').textContent = phase === 'before' ? '· before disruption' : DATA.disruption ? '· after disruption & rematch' : '';
+  $('#sideCounts').textContent = `${d.counts.requests} requests · ${d.counts.offers} surplus reports · ${d.counts.matches} transfers`;
+  const dis = DATA.disruption, banner = $('#banner');
+  if (dis && phase === 'after') {
+    const cw = dis.coverage_waterfall.steps;
+    banner.hidden = false;
+    banner.innerHTML = `<svg class="icon" width="26" height="26" viewBox="0 0 24 24"><path d="M12 2 1 21h22L12 2z" fill="var(--warn)"/><rect x="11" y="8" width="2" height="7" fill="#fff"/><rect x="11" y="17" width="2" height="2" fill="#fff"/></svg><div><b>${esc(dis.description)}</b><br/>
+      ${dis.invalidated_matches} planned transfers were broken. AURA AI rematched ${dis.coverage_waterfall.rematches} transfers: coverage went from ${cw[0].value.toFixed(1)}% to ${cw[3].value.toFixed(1)}% now, and reaches
+      <b>${dis.coverage_waterfall.projected.toFixed(1)}%</b> once pending substitutions are approved.</div>`;
+  } else banner.hidden = true;
+  renderKPIs(); renderBullet(); renderStacked(); renderUtil(); renderHeat(); renderWaterfalls(); renderQueue(); renderDonut(); renderPlan();
+}
+
+function scenarioFromForm(enabled) {
+  const list = (s) => s.split(',').map((x) => x.trim()).filter(Boolean);
+  const cities = list($('#dCities').value), orgs = list($('#dOrgs').value);
+  const auto = 'Disruption: ' + [cities.length ? 'road closures in ' + cities.join(', ') : '', orgs.length ? orgs.join(', ') + ' withdrew' : ''].filter(Boolean).join('; ');
+  // Keep the demo's narrative text unless the user has edited the scenario.
+  return { enabled, description: demoDescription || auto,
+    closed_cities: list($('#dCities').value), withdrawn_orgs: list($('#dOrgs').value), advance_days: parseInt($('#dDays').value || '0', 10) || 0, new_offers: $('#dNew').value };
+}
+async function analyze() {
+  const body = { requests: $('#reqText').value, offers: $('#offText').value };
+  const on = $('#dOn').checked;
+  $('#runBtn').disabled = true; $('#runBtn').textContent = 'Analyzing…';
+  try {
+    const call = (scenario) => fetch('/api/dashboard', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, scenario }) }).then((r) => r.json());
+    const [after, before] = await Promise.all([call(scenarioFromForm(on)), on ? call({ enabled: false }) : Promise.resolve(null)]);
+    if (after.error) throw new Error(after.error);
+    DATA = after; BEFORE = before; if (!on) phase = 'after';
+    $('#phaseSeg').style.display = on ? '' : 'none';
+    const sk = [...after.skipped.requests, ...after.skipped.offers];
+    $('#skipped').textContent = sk.length ? `Warning: ${sk.length} line(s) not recognized (no catalog item found): ${sk.slice(0, 3).join(' · ')}${sk.length > 3 ? ' …' : ''}` : '';
+    renderAll();
+    if (!sk.length) document.body.classList.remove('open');
+  } catch (e) { $('#skipped').textContent = 'Error: ' + e.message; }
+  finally { $('#runBtn').disabled = false; $('#runBtn').textContent = 'Analyze network'; }
+}
+
+let demoDescription = '';
+async function loadDemo(run) {
+  const d = await fetch('/api/demo').then((r) => r.json());
+  demoDescription = d.scenario.description;
+  $('#reqText').value = d.requests.join('\n'); $('#offText').value = d.offers.join('\n');
+  $('#dOn').checked = !!d.scenario.enabled; $('#dCities').value = d.scenario.closed_cities.join(', ');
+  $('#dOrgs').value = d.scenario.withdrawn_orgs.join(', '); $('#dDays').value = d.scenario.advance_days; $('#dNew').value = d.scenario.new_offers;
+  updateCounts(); if (run) analyze();
+}
+function updateCounts() {
+  const n = (s) => s.split('\n').filter((l) => l.trim()).length;
+  $('#reqCount').textContent = n($('#reqText').value) + ' lines'; $('#offCount').textContent = n($('#offText').value) + ' lines';
+}
+
+/* ===================== events ===================== */
+const openDrawer = (e) => { if (e) e.preventDefault(); document.body.classList.add('open'); };
+$('#editBtn').onclick = openDrawer; $('#openData').onclick = openDrawer;
+$('#closeDrawer').onclick = () => document.body.classList.remove('open'); $('#drawerBg').onclick = $('#closeDrawer').onclick;
+$('#runBtn').onclick = analyze; $('#loadDemo').onclick = () => loadDemo(false);
+$('#clearBtn').onclick = () => { ['#reqText', '#offText', '#dCities', '#dOrgs', '#dDays', '#dNew'].forEach((s) => ($(s).value = '')); updateCounts(); };
+$('#reqText').oninput = updateCounts; $('#offText').oninput = updateCounts;
+['#dCities', '#dOrgs', '#dDays', '#dNew'].forEach((s) => $(s).addEventListener('input', () => (demoDescription = '')));
+$('#wfCat').onchange = renderWaterfalls;
+const seg = (id, fn) => $(id).querySelectorAll('button').forEach((b) => (b.onclick = () => { $(id).querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); fn(b); renderAll(); }));
+seg('#phaseSeg', (b) => (phase = b.dataset.phase)); seg('#bulletSeg', (b) => (bulletN = +b.dataset.n));
+seg('#heatSeg', (b) => (heatMode = b.dataset.mode)); seg('#planSeg', (b) => (planFilter = b.dataset.f));
+$('#themeBtn').onclick = () => { const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'; document.documentElement.dataset.theme = t; localStorage.setItem('aura-theme', t); syncThemeBtn(); renderAll(); };
+const syncThemeBtn = () => ($('#themeBtn').textContent = document.documentElement.dataset.theme === 'dark' ? 'Light mode' : 'Dark mode');
+document.documentElement.dataset.theme = localStorage.getItem('aura-theme') || 'light';
+syncThemeBtn();
+document.querySelectorAll('#nav a').forEach((a) => a.addEventListener('click', () => { document.querySelectorAll('#nav a').forEach((x) => x.classList.toggle('active', x === a)); }));
+
+loadDemo(true);
+</script>
+</body>
+</html>

@@ -21,6 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 AURA_AI_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, AURA_AI_DIR)
 
+import engine  # noqa: E402
 from extractor import extract  # noqa: E402
 from matcher import build_transfer_plan  # noqa: E402
 
@@ -101,26 +102,43 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _file(self, path: str, content_type: str) -> None:
+        with open(path, "rb") as f:
+            self._send(200, f.read(), content_type)
+
     def do_GET(self):  # noqa: N802
-        if self.path in ("/", "/index.html"):
-            with open(os.path.join(HERE, "index.html"), "rb") as f:
-                self._send(200, f.read(), "text/html; charset=utf-8")
-        elif self.path in ("/dashboard", "/dashboard.html"):
-            with open(os.path.join(HERE, "dashboard.html"), "rb") as f:
-                self._send(200, f.read(), "text/html; charset=utf-8")
-        elif self.path == "/sample":
-            # Serve the bundled 30 sample messages so the demo is one click.
-            with open(os.path.join(AURA_AI_DIR, "sample_messages.json"), "rb") as f:
-                self._send(200, f.read(), "application/json")
+        route = self.path.split("?", 1)[0]
+        if route in ("/", "/dashboard", "/dashboard.html"):
+            self._file(os.path.join(HERE, "dashboard.html"), "text/html; charset=utf-8")
+        elif route in ("/classic", "/index.html"):
+            self._file(os.path.join(HERE, "index.html"), "text/html; charset=utf-8")
+        elif route == "/api/demo":
+            self._file(os.path.join(AURA_AI_DIR, "demo_scenario.json"), "application/json")
+        elif route == "/sample":
+            # Bundled sample messages for the classic view.
+            self._file(os.path.join(AURA_AI_DIR, "sample_messages.json"), "application/json")
         else:
             self._send(404, b"Not found", "text/plain")
 
     def do_POST(self):  # noqa: N802
+        length = int(self.headers.get("Content-Length", "0"))
+        payload = json.loads(self.rfile.read(length) or b"{}")
+
+        if self.path == "/api/dashboard":
+            try:
+                result = engine.run(
+                    payload.get("requests", ""),
+                    payload.get("offers", ""),
+                    payload.get("scenario"),
+                )
+                self._send(200, json.dumps(result, default=str).encode("utf-8"), "application/json")
+            except Exception as exc:  # noqa: BLE001
+                self._send(500, json.dumps({"error": str(exc)}).encode("utf-8"), "application/json")
+            return
+
         if self.path != "/api/process":
             self._send(404, b"Not found", "text/plain")
             return
-        length = int(self.headers.get("Content-Length", "0"))
-        payload = json.loads(self.rfile.read(length) or b"{}")
 
         if "text" in payload:
             raw_messages = parse_pasted_text(payload["text"])

@@ -14,7 +14,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the application.
-COPY app.py pipeline.py ./
+COPY app.py pipeline.py catalog.py metrics.py engine.py ./
 COPY static ./static
 
 EXPOSE 8000

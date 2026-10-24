@@ -43,7 +43,7 @@ python demo.py --offline
 
 # Run with real Bedrock extraction (needs AWS auth + model access).
 # Make the Bedrock client importable, then run:
-PYTHONPATH=../app python demo.py
+python demo.py   # classic demo; the dashboard uses USE_BEDROCK=1
 ```
 
 ### Prefer a web UI?
@@ -99,4 +99,4 @@ transfer plan is returned. No database is required. The structured results
 (`Message`, `Transfer`, and alert dicts) serialize cleanly to JSON, so they can
 be rendered by the web UI or returned from an API without any storage layer.
 
-See `../app/` for the Bedrock client this demo reuses.
+The dashboard engine (`engine.py`) calls Bedrock directly when `USE_BEDROCK=1`.
