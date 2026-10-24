@@ -13,6 +13,7 @@ import json
 import re
 
 from models import CATEGORIES, Message
+from urgency import reconcile, score_urgency
 
 SYSTEM = (
     "You are AURA AI's extraction engine for a food-bank mutual-aid network. "
@@ -43,9 +44,70 @@ def _bedrock_extract(org: str, text: str) -> dict:
 
     prompt = PROMPT_TEMPLATE.format(org=org, text=text, categories=CATEGORIES)
     raw = bedrock_client.generate(prompt, system=SYSTEM, temperature=0)
-    # The model may wrap JSON in markdown fences; strip them.
-    match = re.search(r"\{.*\}", raw, re.DOTALL)
-    return json.loads(match.group(0) if match else raw)
+    return _parse_json_object(raw)
+
+
+def _parse_json_object(raw: str) -> dict:
+    """Extract a JSON object from a model reply, tolerating common wrapping.
+
+    Models sometimes wrap JSON in markdown fences, add a prose sentence before
+    or after it, or emit more than one block. We try the cheapest strategies
+    first, then fall back to scanning for the first complete, brace-balanced
+    object so trailing text can't break parsing.
+    """
+    # 1. Clean reply: parse as-is.
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    # 2. Strip ```json ... ``` (or plain ```) fences, then retry.
+    fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", raw, re.DOTALL | re.IGNORECASE)
+    if fenced:
+        try:
+            return json.loads(fenced.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # 3. Scan for the first complete, brace-balanced object, ignoring braces
+    #    that appear inside strings. This stops trailing prose or a second
+    #    block from corrupting the match.
+    candidate = _first_balanced_object(raw)
+    if candidate is not None:
+        return json.loads(candidate)
+
+    # Nothing parseable -- let the caller fall back to offline extraction.
+    raise ValueError("no JSON object found in model reply")
+
+
+def _first_balanced_object(text: str) -> str | None:
+    """Return the first substring that is a balanced {...} object, or None."""
+    start = text.find("{")
+    if start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escaped = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return None
 
 
 # --- Offline fallback -------------------------------------------------------
@@ -108,15 +170,13 @@ def _fallback_extract(org: str, text: str) -> dict:
         if anywhere:
             unit = anywhere.group(1)
 
-    urgency = 1
-    if any(w in lower for w in ["asap", "urgent", "critical", "emergency", "out of", "ran out", "!!"]):
-        urgency = 5
-    elif any(w in lower for w in ["soon", "running low", "low on"]):
-        urgency = 3
-
     constraints = [c for c, words in _CONSTRAINT_KEYWORDS.items() if any(w in lower for w in words)]
     if category == "baby_formula" and "infant" not in constraints:
         constraints.append("infant")
+
+    # Urgency comes from the shared deterministic model so offline and live
+    # extraction agree on what "urgent" means.
+    urgency = score_urgency(kind, category, text, constraints)
 
     item = category.replace("_", " ")
     return {
@@ -148,15 +208,25 @@ def extract(message_id: str, org: str, text: str, *, use_bedrock: bool = True) -
     if category not in CATEGORIES:
         category = "other"
 
+    kind = data.get("kind", "request")
+    constraints = list(data.get("constraints", []) or [])
+
+    # Reconcile any model-proposed urgency with the deterministic floor so a
+    # critical stockout of a sensitive item is never under-rated (and offers
+    # are never treated as urgent).
+    proposed = data.get("urgency")
+    urgency = reconcile(kind, category, text, constraints,
+                        int(proposed) if proposed is not None else None)
+
     return Message(
         message_id=message_id,
         org=org,
-        kind=data.get("kind", "request"),
+        kind=kind,
         category=category,
         item=data.get("item", category.replace("_", " ")),
         quantity=float(data.get("quantity", 1) or 1),
         unit=data.get("unit", "units"),
-        urgency=int(data.get("urgency", 1) or 1),
-        constraints=list(data.get("constraints", []) or []),
+        urgency=urgency,
+        constraints=constraints,
         raw_text=text,
     )
