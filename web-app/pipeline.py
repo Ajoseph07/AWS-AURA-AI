@@ -61,8 +61,10 @@ class Transfer:
 # --------------------------------------------------------------------------- #
 # Bedrock client (lazy — only imported/used when live extraction is on)
 # --------------------------------------------------------------------------- #
-MODEL_ID = os.environ.get("BEDROCK_MODEL_ID", "anthropic.claude-sonnet-4-6")
-REGION = os.environ.get("AWS_REGION", "us-east-1")
+MODEL_ID = os.environ.get(
+    "BEDROCK_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+)
+REGION = os.environ.get("BEDROCK_REGION", "us-east-2")
 USE_BEDROCK = os.environ.get("USE_BEDROCK", "auto")  # "auto" | "1" | "0"
 
 _bedrock = None
