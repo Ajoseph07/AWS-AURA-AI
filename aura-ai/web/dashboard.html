@@ -62,6 +62,16 @@
   .seg button { border: 0; border-radius: 0; padding: 5px 11px; font-size: 12px; background: transparent; color: var(--muted); }
   .seg button.on { background: var(--accent); color: #fff; }
 
+  /* Search box (top bar) */
+  .search { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); padding: 5px 10px; color: var(--muted); min-width: 230px; }
+  .search:focus-within { outline: 2px solid var(--accent); border-color: transparent; }
+  .search input { border: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; outline: none; flex: 1; min-width: 0; }
+  .search input::placeholder { color: var(--muted); }
+  .search-count { font-size: 11px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+  tr.search-hidden { display: none; }
+  mark { background: var(--warn); color: inherit; border-radius: 2px; padding: 0 1px; }
+  [data-theme="dark"] mark { background: #6a5410; color: #ffe27a; }
+
   .content { padding: 20px 26px 40px; display: grid; gap: 22px; }
   .section-title { font-size: 13px; font-weight: 800; color: var(--heading); margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
   .section-title .hint { font-weight: 500; color: var(--muted); font-size: 12px; }
@@ -184,6 +194,11 @@
       <h1>Food Bank Network Dashboard</h1>
       <span class="pill warn">SIMULATED DATA</span>
       <span class="pill" id="modePill">rules</span>
+      <div class="search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input id="searchBox" type="search" placeholder="Search food bank, item, or city…" autocomplete="off" />
+        <span class="search-count" id="searchCount"></span>
+      </div>
       <div class="spacer"></div>
       <div class="seg" id="phaseSeg" title="Compare before vs. after the disruption">
         <button data-phase="after" class="on">After disruption</button>
@@ -583,6 +598,69 @@ function renderAll() {
       <b>${dis.coverage_waterfall.projected.toFixed(1)}%</b> once pending substitutions are approved.</div>`;
   } else banner.hidden = true;
   renderKPIs(); renderBullet(); renderStacked(); renderUtil(); renderHeat(); renderWaterfalls(); renderQueue(); renderDonut(); renderPlan();
+  applySearch();
+}
+
+/* ===================== Search / filter ===================== */
+// Filters the Priority Requests and Transfer Plan tables live by food bank,
+// item, or city. Highlights matches and shows a result count in the top bar.
+function applySearch() {
+  const box = $('#searchBox');
+  if (!box) return;
+  const q = box.value.trim().toLowerCase();
+  const tables = ['#queue', '#planTable'];
+  let shown = 0, total = 0;
+
+  tables.forEach((sel) => {
+    const tbody = $(sel) && $(sel).querySelector('tbody');
+    if (!tbody) return;
+    tbody.querySelectorAll('tr').forEach((row) => {
+      if (row.querySelector('td.empty')) return; // skip "no rows" placeholder
+      total++;
+      const hit = !q || row.textContent.toLowerCase().includes(q);
+      row.classList.toggle('search-hidden', !hit);
+      if (hit) shown++;
+      // (re)apply highlight only on matching rows
+      clearMarks(row);
+      if (q && hit) highlightRow(row, q);
+    });
+  });
+
+  const c = $('#searchCount');
+  c.textContent = q ? `${shown}/${total}` : '';
+}
+
+function clearMarks(row) {
+  row.querySelectorAll('mark').forEach((m) => {
+    const t = document.createTextNode(m.textContent);
+    m.parentNode.replaceChild(t, m);
+    t.parentNode.normalize();
+  });
+}
+
+// Wrap matching substrings in <mark> within leaf text nodes only (keeps tags).
+function highlightRow(row, q) {
+  const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT, null);
+  const targets = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.nodeValue.toLowerCase().includes(q) && node.parentNode.nodeName !== 'MARK') {
+      targets.push(node);
+    }
+  }
+  targets.forEach((textNode) => {
+    const val = textNode.nodeValue, low = val.toLowerCase(), frag = document.createDocumentFragment();
+    let i = 0, idx;
+    while ((idx = low.indexOf(q, i)) !== -1) {
+      if (idx > i) frag.appendChild(document.createTextNode(val.slice(i, idx)));
+      const mk = document.createElement('mark');
+      mk.textContent = val.slice(idx, idx + q.length);
+      frag.appendChild(mk);
+      i = idx + q.length;
+    }
+    if (i < val.length) frag.appendChild(document.createTextNode(val.slice(i)));
+    textNode.parentNode.replaceChild(frag, textNode);
+  });
 }
 
 function scenarioFromForm(enabled) {
@@ -634,6 +712,7 @@ $('#clearBtn').onclick = () => { ['#reqText', '#offText', '#dCities', '#dOrgs', 
 $('#reqText').oninput = updateCounts; $('#offText').oninput = updateCounts;
 ['#dCities', '#dOrgs', '#dDays', '#dNew'].forEach((s) => $(s).addEventListener('input', () => (demoDescription = '')));
 $('#wfCat').onchange = renderWaterfalls;
+$('#searchBox').addEventListener('input', applySearch);
 const seg = (id, fn) => $(id).querySelectorAll('button').forEach((b) => (b.onclick = () => { $(id).querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); fn(b); renderAll(); }));
 seg('#phaseSeg', (b) => (phase = b.dataset.phase)); seg('#bulletSeg', (b) => (bulletN = +b.dataset.n));
 seg('#heatSeg', (b) => (heatMode = b.dataset.mode)); seg('#planSeg', (b) => (planFilter = b.dataset.f));
